@@ -1,0 +1,8 @@
+data/
+tmp/
+logs/
+*.log
+.DS_Store
+settings.*
+*.pyc
+

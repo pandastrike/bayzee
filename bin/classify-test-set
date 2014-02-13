@@ -1,0 +1,10 @@
+#!/bin/bash
+for((i = $1; i <= $2; i++))
+do 
+  name="data/test-set-files/test-set-part-$i"
+  echo "Classifying phrases from $name......."
+  echo
+  python "bin/run config.yaml -c " $name
+  echo "Finished classifying phrases from $name........."
+  echo
+done

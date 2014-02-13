@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+import sys
+import yaml
+import os
+import imp 
+sys.path.append(os.path.abspath(os.path.join(__file__,"../..")))
+from src import classifier,generator
+from lib import processor 
+
+if len(sys.argv) > 1:
+  configFilePath = os.path.abspath(os.path.join(__file__,"../..","config",sys.argv[1]))
+  args = sys.argv[2:]
+  if not os.path.exists(configFilePath):
+    print "config file does not exist"
+    sys.exit(0)
+  try:
+    dataStream = open(configFilePath, "r")
+    config = yaml.load(dataStream)
+  except:
+    error = sys.exc_info()
+    print "Error occured", error
+  else:
+    for i in range(0, len(args)):
+      arg = args[i]
+      if arg == "-g" or arg == "--generate":
+        phraseGenerator = generator.Generator(config)
+        phraseGenerator.run()
+      if arg == "-c" or arg == "--classify":
+        testFilePath = args[i+1]
+        i += 1
+        if testFilePath != None:
+          config["classifier"]["input_file"] = testFilePath
+        phraseClassifier = classifier.Classifier(config)
+        phraseClassifier.run()
+      if arg == "-a" or arg == "--annotate":
+        phraseProcessor = processor.Processor(config)
+        phraseProcessor.process()
+else:
+  print "Please enter a valid environment"
+  sys.exit(0)
+
+
+
+

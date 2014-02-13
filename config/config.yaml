@@ -1,0 +1,41 @@
+elasticsearch: 
+  host: "127.0.0.1"
+  port: 9200
+
+data:
+  index: "gluten_products"
+  type: "product"
+  fields: ["name","category","description"]
+
+reference_data:
+  index:
+  type:
+  fields: ["name"]
+
+generator:
+  max_shingle_size: 3
+  min_shingle_size: 2
+  output_unigrams: false
+  features: ["doc_count", "max_score", "avg_score", "max_term_frequency", "avg_term_frequency"]
+  float_precesion: 4
+
+classifier:
+  input_file: "data/test-set.csv"
+  output_path: "data"
+  print_measures: True  
+
+processors:
+  delete_index_on_start: True
+  index: "gluten_products__annotations__"
+  type: "gluten_product"
+  modules:
+    pos_processor:
+      name: "pos_processor"
+      path: "./lib/pos_processor.py"
+      es_field_name: "pos_tags"
+      features: ["avg_word_length", "pos_tags", "first_pos_tag", "middle_pos_tag", "last_pos_tag", "non_alpha_chars"]
+      properties:
+        type: "nested"
+        index: "no"
+
+
