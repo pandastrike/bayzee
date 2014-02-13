@@ -31,13 +31,16 @@ class Processor:
       if "es_field_name" in module:
         properties[module["es_field_name"]] = module["properties"]
     mapping = {self.config["processors"]["type"]:{"properties":properties}}
-    if not self.esClient.indices.exists(index=self.processor_index):
-      self.esClient.indices.create(index=config["processors"]["index"], body=mapping)
     self.processors = processors
     self.properties = properties
 
     if "load_data" in config:
       self.__loadContent()
+    elif config["processors"]["delete_index_on_start"]:
+      self.esClient.indices.delete(index=config["processors"]["index"])
+
+    if not self.esClient.indices.exists(index=self.processor_index):
+      self.esClient.indices.create(index=config["processors"]["index"], body=mapping)
 
   def process(self):
     size = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}}}, fields=[])
@@ -56,13 +59,16 @@ class Processor:
       self.esClient.index(index=self.processor_index, doc_type=self.processor_type, id=docId, body=data)
 
   def __loadContent(self):
-    size = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}}}, fields=[])
-    self.documentsSize = size["hits"]["total"]
-    self.documents = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}},"size":size["hits"]["total"]},fields = self.data_fields)
-    for document in self.documents["hits"]["hits"]:
-      docId = document["_id"]
-      data = self.esClient.get(index=self.processor_index, doc_type=self.processor_type, id=docId)
-      self.annotations[docId] = data["_source"]
+    if self.esClient.indices.exists(index=self.processor_index):
+      size = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}}}, fields=[])
+      self.documentsSize = size["hits"]["total"]
+      self.documents = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}},"size":size["hits"]["total"]},fields = self.data_fields)
+      for document in self.documents["hits"]["hits"]:
+        docId = document["_id"]
+        data = self.esClient.get(index=self.processor_index, doc_type=self.processor_type, id=docId)
+        self.annotations[docId] = data["_source"]
+    else:
+      print "annotations index does not exist please run annotate command"
 
   def getFeatures(self, docId, phrase):
     features = {}

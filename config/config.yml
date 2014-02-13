@@ -16,22 +16,22 @@ generator:
   max_shingle_size: 3
   min_shingle_size: 2
   output_unigrams: false
-  features: ["doc_count", "max_score", "avg_score", "max_term_frequency", "avg_term_frequency"]
-  float_precesion: 4
+  fields: ["name","category","description","manufacturer"]
+  features: ["doc_count", "max_term_frequency", "avg_term_frequency", "max_score", "avg_score"]
+  float_precision: 4
 
 classifier:
-  input_file: "data/test-set.csv"
   output_path: "data"
   print_measures: True  
 
 processors:
-  delete_index_on_start: True
+  delete_index_on_start: False
   index: "gluten_products__annotations__"
   type: "gluten_product"
   modules:
     pos_processor:
       name: "pos_processor"
-      path: "./lib/pos_processor.py"
+      path: "./lib/pos-processor.py"
       es_field_name: "pos_tags"
       features: ["avg_word_length", "pos_tags", "first_pos_tag", "middle_pos_tag", "last_pos_tag", "non_alpha_chars"]
       properties:

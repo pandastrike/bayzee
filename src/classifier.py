@@ -4,6 +4,8 @@ import orange
 import sys
 import os.path
 import pickle
+import nltk
+import time
 from elasticsearch import Elasticsearch
 from lib import processor
 
@@ -79,7 +81,8 @@ class Classifier:
         featureSet[feature] = row[index].value
 
       addlFeatures = self.processor.getFeatures(docId, phrase)
-
+      
+     
       for key, value in addlFeatures.iteritems():
         featureSet[key] = value
 
@@ -119,6 +122,7 @@ class Classifier:
 
     self.trainD = self.__loadDataFromCSV(self.directory + "/data/training-set.csv", "train", None)
     self.holdOutD = self.__loadDataFromCSV(self.directory + "/data/hold-out-set.csv", "hold", self.trainD.domain)
+    self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
     self.holdOutD = orange.ExampleTable(self.trainD.domain, self.holdOutD)
     
     for row in self.holdOutD:
@@ -134,7 +138,11 @@ class Classifier:
 
       for key, value in addlFeatures.iteritems():
         featureSet[key] = value
-        
+
+      if self.classifier == None:
+        classifierFile = open(self.classifierFilePath)
+        self.classifier = pickle.load(classifierFile)
+        classifierFile.close()  
       prob = self.classifier.prob_classify(featureSet).prob("1")
       class_type = self.classifier.classify(featureSet)
 
@@ -151,6 +159,7 @@ class Classifier:
         totalHoldOutGoodPhrases += 1
       else:
         totalHoldOutBadPhrases += 1
+
     precesionOfGood = 100.0 * truePositives/totalPositives
     recallOfGood = 100.0 * truePositives/totalHoldOutGoodPhrases
     precesionOfBad = 100.0 * trueNegatives/totalNegatives

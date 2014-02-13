@@ -26,6 +26,7 @@ class Generator:
     self.bagOfPhrases = {}
     self.data_index = config["data"]["index"]
     self.data_fields = config["data"]["fields"]
+    self.generator_fields = config["generator"]["fields"]
     self.hasReference = False
     self.documentsSize = 0
     self.analyzerIndex = self.data_index + "__analysis__"
@@ -136,14 +137,13 @@ class Generator:
 
   def __addShinglesToBag(self, documentId, shingles):
     global esStopWords
-    fields = self.config["data"]["fields"]
-    floatPrecesion = "{0:." + str(self.config["generator"]["float_precesion"]) + "f}"
+    floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
     features = self.config["generator"]["features"]
     for shingle in shingles:
       token = shingle["token"]
       if token not in self.bagOfPhrases:
         entry = self.bagOfPhrases[token] = {}
-        shouldMatch = map(lambda x: {"match_phrase":{x:token}}, fields)
+        shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.generator_fields)
         query = {"query":{"bool":{"should":shouldMatch}}}
         data = self.esClient.search(index=self.data_index, doc_type=self.documentType, body=query, explain=True, size= self.documentsSize)
         entry["max_score"] = 0
@@ -151,27 +151,26 @@ class Generator:
         avg_score = 0
         max_term_frequency = 0
         avg_term_frequency = 0
-
-        if "max_term_frequency" in features or "avg_term_frequency" in features:
-          for hit in data["hits"]["hits"]:
-            avg_score += int(hit["_score"])
-            numOfScores = 0
-            hit_term_frequency = 0
-            explanation = json.dumps(hit["_explanation"])
-            while len(explanation) > len(token):
-              indexOfToken = explanation.find("tf(") + len("tf(")
-              if indexOfToken < len("tf("):
-                break
-              explanation = explanation[indexOfToken:]
-              freqToken = explanation.split(")")[0]
-              explanation = explanation.split(")")[1]
-              if freqToken.find("freq=") >= 0:
-                numOfScores += 1
-                hit_term_frequency += float(freqToken.split("=")[1])
-            if numOfScores > 0 : hit_term_frequency = hit_term_frequency / numOfScores
-            if max_term_frequency < hit_term_frequency: max_term_frequency = hit_term_frequency 
-            avg_term_frequency += hit_term_frequency
         
+        for hit in data["hits"]["hits"]:
+          avg_score += float(hit["_score"])
+          numOfScores = 0
+          hit_term_frequency = 0
+          explanation = json.dumps(hit["_explanation"])
+          while len(explanation) > len(token):
+            indexOfToken = explanation.find("tf(") + len("tf(")
+            if indexOfToken < len("tf("):
+              break
+            explanation = explanation[indexOfToken:]
+            freqToken = explanation.split(")")[0]
+            explanation = explanation.split(")")[1]
+            if freqToken.find("freq=") >= 0:
+              numOfScores += 1
+              hit_term_frequency += float(freqToken.split("=")[1])
+          if numOfScores > 0 : hit_term_frequency = hit_term_frequency / numOfScores
+          if max_term_frequency < hit_term_frequency: max_term_frequency = hit_term_frequency 
+          avg_term_frequency += hit_term_frequency
+
         if len(data["hits"]["hits"]) > 0:
           avg_term_frequency = avg_term_frequency * 1.0 / len(data["hits"]["hits"])
         
@@ -183,15 +182,15 @@ class Generator:
         
         entry["document_id"] = documentId
         if "max_score" in features:
-          entry["max_score"] = floatPrecesion.format(float(max_score))
+          entry["max_score"] = floatPrecision.format(float(max_score))
         if "doc_count" in features:
-          entry["doc_count"] = floatPrecesion.format(float(data["hits"]["total"]))
+          entry["doc_count"] = floatPrecision.format(float(data["hits"]["total"]))
         if "avg_score" in features:
-          entry["avg_score"] = floatPrecesion.format(float(avg_score))
+          entry["avg_score"] = floatPrecision.format(float(avg_score))
         if "max_term_frequency" in features:
-          entry["max_term_frequency"] = floatPrecesion.format(float(max_term_frequency))
+          entry["max_term_frequency"] = floatPrecision.format(float(max_term_frequency))
         if "avg_term_frequency" in features:
-          entry["avg_term_frequency"] = floatPrecesion.format(float(avg_term_frequency))
+          entry["avg_term_frequency"] = floatPrecision.format(float(avg_term_frequency))
         
         if self.hasReference:
           permutations = self.__getPermutationsOfTokens(token.split(" "))
@@ -199,9 +198,9 @@ class Generator:
           query = {"bool":{"should":matchPhrases}}
           data = self.esClient.count(index=self.reference_index, doc_type=self.reference_type, body=query)
           if data["count"] > 0:
-            entry["phrase_match_" + self.reference_type] = 1
+            entry["phrase_matches_" + self.reference_type] = 1
           else:
-            entry["phrase_match_" + self.reference_type] = 0
+            entry["phrase_matches_" + self.reference_type] = 0
           count = 0
           words = token.split(" ")
           words = filter(lambda x: x not in esStopWords, words)
@@ -248,7 +247,7 @@ class Generator:
 
     #csv writers
     if self.hasReference:
-      features.append("phrase_match_" + self.reference_type)
+      features.append("phrase_matches_" + self.reference_type)
       features.append(self.reference_type+"_similarity")
 
     headers = ["m#document_id","m#phrase"] + features
