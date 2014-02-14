@@ -18,18 +18,22 @@ __name__ = "generator"
 
 class Generator:
   
-  def __init__(self, config):
+  def __init__(self, config, dataDir, trainingDataset, holdOutDataset):
     self.config = config
-    self.esClient = Elasticsearch()
-    self.documents = None
-    self.configFilePath = "config"
+    self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
+    self.dataDir = dataDir
+    self.trainingDataset = trainingDataset
+    self.holdOutDataset = holdOutDataset
     self.bagOfPhrases = {}
-    self.data_index = config["data"]["index"]
-    self.data_fields = config["data"]["fields"]
-    self.generator_fields = config["generator"]["fields"]
-    self.documentsSize = 0
-    self.analyzerIndex = self.data_index + "__analysis__"
-    self.analyzer_settings = {
+    self.corpusIndex = config["corpus"]["index"]
+    self.corpusType = config["corpus"]["type"]
+    self.corpusFields = config["corpus"]["fields"]
+    self.generatorFields = config["generator"]["fields"]
+    self.corpusSize = 0
+    self.processorIndex = config["processor"]["index"]
+    self.processorType = config["processor"]["type"]
+    self.analyzerIndex = self.corpusIndex + "__analysis__"
+    self.analyzerSettings = {
       "index":{
         "analysis":{
           "analyzer":{
@@ -44,7 +48,7 @@ class Generator:
               "type": "shingle",
               "max_shingle_size": config["generator"]["max_shingle_size"],
               "min_shingle_size": config["generator"]["min_shingle_size"],
-              "output_unigrams": config["generator"]["output_unigrams"]
+              "output_unigrams": (config["generator"]["min_shingle_size"] == 1)
             },
             "filter_stop":{
               "type": "stop"
@@ -53,28 +57,26 @@ class Generator:
         }
       }
     }
-    self.documentType = config["data"]["type"]
-    self.stopWords = []
-    self.directory = os.path.abspath(os.path.join(__file__,"../.."))
-    
-    stopWordFile = open(self.directory + "/" + self.configFilePath + "/stop-words.txt")
-    for word in stopWordFile.readlines():
-      self.stopWords.append(word.strip())
+
+    self.featureNames = map(lambda x: x["name"], config["generator"]["features"])
+    for module in config["processor"]["modules"]:
+      self.featureNames = self.featureNames + map(lambda x: x["name"], module["features"])
+
     try:
-      #initialize the elasticsearch
       if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
-      data = self.esClient.indices.create(self.analyzerIndex, self.analyzer_settings) 
+      data = self.esClient.indices.create(self.analyzerIndex, self.analyzerSettings) 
     except:
       error = sys.exc_info()
       print "Error occurred during initialization of analyzer index", error
+      sys.exit(1)
     else:
       sleep(1)
 
-  def run(self):
+  def generate(self):
     self.__analyzeDocuments()
     self.__writeToFile()
-    self.__deleteIndex()
+    self.__deleteAnalyzerIndex()
 
   def __replaceUnderscore(self,shingle):
     token = shingle["token"]
@@ -84,6 +86,7 @@ class Generator:
     return shingle
     
   def __filterTokens(self, shingle):
+    global esStopWords
     tokens = shingle["token"].split(" ")
     firstToken = tokens[0]
     lastToken = tokens[-1]
@@ -92,18 +95,18 @@ class Generator:
     isValid = (isValid and len(lastToken) > 1)
     isValid = (isValid and not firstToken.replace(".","",1).isdigit())
     isValid = (isValid and not lastToken.replace(".","",1).isdigit())
-    isValid = (isValid and firstToken not in self.stopWords)
-    isValid = (isValid and lastToken not in self.stopWords)
+    isValid = (isValid and firstToken not in esStopWords)
+    isValid = (isValid and lastToken not in esStopWords)
     return isValid
 
   def __analyzeDocuments(self):
-    size = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}}},fields=[])
-    self.documentsSize = size["hits"]["total"]
-    self.documents = self.esClient.search(index=self.data_index, body={"query":{"match_all":{}},"size":size["hits"]["total"]},fields=self.data_fields)
-    print "analyzing ", self.documentsSize, " documents"
-    for document in self.documents["hits"]["hits"]:
-      print "generating phrases for ", document["_id"]
-      for field in self.data_fields:
+    count = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"match_all":{}})
+    self.corpusSize = count["count"]
+    documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}, "size":self.corpusSize}, fields=self.corpusFields)
+
+    print "Generating phrases and their features from " + str(self.corpusSize) + " documents..."
+    for document in documents["hits"]["hits"]:
+      for field in self.corpusFields:
         shingles = []
         if type(document["fields"][field]) is list:
           for element in document["fields"][field]:
@@ -117,29 +120,27 @@ class Generator:
         shingles = filter(self.__filterTokens, shingles)
         if shingles != None and len(shingles) > 0:
           self.__addShinglesToBag(document["_id"], shingles)
-
+      print "Generated from", document["_id"]
 
   def __addShinglesToBag(self, documentId, shingles):
-    global esStopWords
     floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
-    features = self.config["generator"]["features"]
     for shingle in shingles:
       token = shingle["token"]
       if token not in self.bagOfPhrases:
         entry = self.bagOfPhrases[token] = {}
-        shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.generator_fields)
+        shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.generatorFields)
         query = {"query":{"bool":{"should":shouldMatch}}}
-        data = self.esClient.search(index=self.data_index, doc_type=self.documentType, body=query, explain=True, size= self.documentsSize)
+        data = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body=query, explain=True, size=self.corpusSize)
         entry["max_score"] = 0
-        max_score = 0
-        avg_score = 0
-        max_term_frequency = 0
-        avg_term_frequency = 0
+        maxScore = 0
+        avgScore = 0
+        maxTermFrequency = 0
+        avgTermFrequency = 0
         
         for hit in data["hits"]["hits"]:
-          avg_score += float(hit["_score"])
+          avgScore += float(hit["_score"])
           numOfScores = 0
-          hit_term_frequency = 0
+          hitTermFrequency = 0
           explanation = json.dumps(hit["_explanation"])
           while len(explanation) > len(token):
             indexOfToken = explanation.find("tf(") + len("tf(")
@@ -150,52 +151,46 @@ class Generator:
             explanation = explanation.split(")")[1]
             if freqToken.find("freq=") >= 0:
               numOfScores += 1
-              hit_term_frequency += float(freqToken.split("=")[1])
-          if numOfScores > 0 : hit_term_frequency = hit_term_frequency / numOfScores
-          if max_term_frequency < hit_term_frequency: max_term_frequency = hit_term_frequency 
-          avg_term_frequency += hit_term_frequency
+              hitTermFrequency += float(freqToken.split("=")[1])
+          if numOfScores > 0 : hitTermFrequency = hitTermFrequency / numOfScores
+          if maxTermFrequency < hitTermFrequency: maxTermFrequency = hitTermFrequency 
+          avgTermFrequency += hitTermFrequency
 
         if len(data["hits"]["hits"]) > 0:
-          avg_term_frequency = avg_term_frequency * 1.0 / len(data["hits"]["hits"])
+          avgTermFrequency = avgTermFrequency * 1.0 / len(data["hits"]["hits"])
         
         if int(data["hits"]["total"]) > 0:
-          avg_score = (avg_score * 1.0) / int(data["hits"]["total"])
+          avgScore = (avgScore * 1.0) / int(data["hits"]["total"])
         
         if data["hits"]["max_score"] != None: 
-          max_score = data["hits"]["max_score"]
+          maxScore = data["hits"]["max_score"]
         
-        entry["document_id"] = documentId
-        if "max_score" in features:
-          entry["max_score"] = floatPrecision.format(float(max_score))
-        if "doc_count" in features:
+        if "max_score" in self.featureNames:
+          entry["max_score"] = floatPrecision.format(float(maxScore))
+        if "doc_count" in self.featureNames:
           entry["doc_count"] = floatPrecision.format(float(data["hits"]["total"]))
-        if "avg_score" in features:
-          entry["avg_score"] = floatPrecision.format(float(avg_score))
-        if "max_term_frequency" in features:
-          entry["max_term_frequency"] = floatPrecision.format(float(max_term_frequency))
-        if "avg_term_frequency" in features:
-          entry["avg_term_frequency"] = floatPrecision.format(float(avg_term_frequency))
+        if "avg_score" in self.featureNames:
+          entry["avg_score"] = floatPrecision.format(float(avgScore))
+        if "max_term_frequency" in self.featureNames:
+          entry["max_term_frequency"] = floatPrecision.format(float(maxTermFrequency))
+        if "avg_term_frequency" in self.featureNames:
+          entry["avg_term_frequency"] = floatPrecision.format(float(avgTermFrequency))
+
+        # get additional features
+        annotatedDocument = self.esClient.get(index=self.processorIndex,doc_type=self.processorType,id=documentId)["_source"]
+        for processorInstance in self.config["processor_instances"]:
+          processorInstance.addFeatures(self.config, token, entry, annotatedDocument)
 
   def __writeToFile(self):
-    trainingRows = {}
-    holdOutRows = {}
-    features = self.config["generator"]["features"]
-    
-    #input files for generation of hold out and training set
-    holdInFile = self.directory + "/"  + self.configFilePath + "/" + "hold-out-phrases.csv"
-    trainingInFile = self.directory + "/" + self.configFilePath  + "/" + "training-phrases.csv"
-    holdInF = open(holdInFile, "r")
-    trainingInF = open(trainingInFile, "r")
-
     #output files
-    holdOutFile = self.directory + "/data/hold-out-set.csv"
-    trainingOutFile =  self.directory + "/data/training-set.csv"
-    testOutFile = self.directory + "/data/test-set.csv"
+    holdOutFile = self.dataDir + "/hold-out-set.csv"
+    trainingOutFile =  self.dataDir + "/training-set.csv"
+    testOutFile = self.dataDir + "/test-set.csv"
     holdOutFile = open(holdOutFile, "w")
     trainingOutFile = open(trainingOutFile, "w")
     testOutFile = open(testOutFile, "w")
 
-    headers = ["m#document_id","m#phrase"] + features
+    headers = ["m#phrase"] + self.featureNames
     holdOutCSVWriter = csv.writer(holdOutFile)
     trainingOutCSVWriter = csv.writer(trainingOutFile)
     testOutCSVWriter = csv.writer(testOutFile)
@@ -206,34 +201,24 @@ class Generator:
     trainingOutCSVWriter.writerow(headers)
     holdOutCSVWriter.writerow(headers)
 
-    for row in holdInF.readlines()[1:]:
-      holdOutRows[row.split(",")[0]] = row.split(",")[1]
-
-    for row in trainingInF.readlines()[1:]:
-      trainingRows[row.split(",")[0]] = row.split(",")[1]
-
     for phrase in self.bagOfPhrases:
       entry = self.bagOfPhrases[phrase]
       phrase = re.sub("[\,]","",phrase)
-      row = [entry["document_id"], phrase]
-      row = [x.encode('utf-8') for x in row]
-      for feature in features:
-        if feature in entry:
-          row.append(entry[feature])
-        else:
-          print phrase, entry["document_id"]
+      row = [phrase.encode('utf-8')]
+      for feature in self.featureNames:
+        row.append(entry[feature])
       testOutCSVWriter.writerow(row)
-      if phrase in trainingRows:
-        row.append(int(trainingRows[phrase]))
+      if phrase in self.trainingDataset:
+        row.append(int(self.trainingDataset[phrase]))
         trainingOutCSVWriter.writerow(row)
         row.pop()
-      if phrase in holdOutRows:
-        row.append(int(holdOutRows[phrase]))
+      if phrase in self.holdOutDataset:
+        row.append(int(self.holdOutDataset[phrase]))
         holdOutCSVWriter.writerow(row)
         row.pop()
 
-  def __deleteIndex(self):
+  def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
-    if os.path.exists(self.directory + "/data/classifier.pickle"):
-      os.remove(self.directory + "/data/classifier.pickle")
+    if os.path.exists(self.dataDir + "/classifier.pickle"):
+      os.remove(self.dataDir + "/classifier.pickle")

@@ -39,8 +39,7 @@ class UnigramChunker(nltk.ChunkParserI):
 train_sents = conll2000.chunked_sents('train.txt')
 chunker = UnigramChunker(train_sents)
 
-def annotateText(document, fields):
-  document = document["fields"]
+def annotateDocument(config, document, fields, annotatedDocument):
   content = ""
   for field in fields:
     if type(document[field]) is list:
@@ -59,9 +58,12 @@ def annotateText(document, fields):
       sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
       posTags = nltk.pos_tag(sentenceWords)
       posTaggedSentences.append(posTags)
-  return posTaggedSentences
 
-def getFeatures(phrase, features, posTaggedSentences):
+  annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
+  print "Annotated document " + document["_id"]
+
+def addFeatures(config, phrase, features, annotatedDocument):
+  posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
   phrase = phrase.replace("\"", "")
   phraseWords = nltk.word_tokenize(phrase)
   foundMatch = True
@@ -105,5 +107,9 @@ def getFeatures(phrase, features, posTaggedSentences):
     if char.isalpha() == False and char != "'":
       nonAlphaChars += 1
   
-  return {"avg_word_length": str(averageWordlength), "pos_tags": posTagString, "first_pos_tag":firstPosTag, "middle_pos_tag": middlePosTag, "last_pos_tag": lastPosTag, "non_alpha_chars": str(nonAlphaChars)}
-  
+  features["pos_tags"] = posTagString
+  features["first_pos_tag"] = firstPosTag
+  features["middle_pos_tag"] = middlePosTag
+  features["last_pos_tag"] = lastPosTag
+  features["avg_word_length"] = str(averageWordlength)
+  features["non_alpha_chars"] = str(nonAlphaChars)

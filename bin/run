@@ -3,40 +3,26 @@ import sys
 import yaml
 import os
 
-sys.path.append(os.path.abspath(os.path.join(__file__,"../..")))
-from src import classifier,generator
-from lib import processor 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from __init__ import annotate,generate,classify
 
-if len(sys.argv) > 1:
-  configFilePath = os.path.abspath(sys.argv[1])
-  args = sys.argv[2:]
-  if not os.path.exists(configFilePath):
-    print "config file does not exist"
-    sys.exit(0)
-  try:
-    dataStream = open(configFilePath, "r")
-    config = yaml.load(dataStream)
-    for key, module in config["processors"]["modules"].iteritems():
-      module["path"] = os.path.abspath(os.path.join(configFilePath, module["path"]))
-  except:
-    error = sys.exc_info()
-    print "Error occured", error
-  else:
-    for i in range(0, len(args)):
-      arg = args[i]
-      if arg == "-g" or arg == "--generate":
-        phraseGenerator = generator.Generator(config)
-        phraseGenerator.run()
-      if arg == "-c" or arg == "--classify":
-        testFilePath = args[i+1]
-        i += 1
-        if testFilePath != None:
-          config["classifier"]["input_file"] = testFilePath
-        phraseClassifier = classifier.Classifier(config)
-        phraseClassifier.run()
-      if arg == "-a" or arg == "--annotate":
-        phraseProcessor = processor.Processor(config)
-        phraseProcessor.process()
+if len(sys.argv) != 3 and len(sys.argv) != 4:
+  print "Invalid number of arguments passed, please see README for usage"
+  sys.exit(1)
+
+option = sys.argv[1]
+configFilePath = os.path.abspath(sys.argv[2])
+
+if option == "-a":
+  annotate(configFilePath)
+elif option == "-g":
+  generate(configFilePath)
+elif option == "-c":
+  testFilePath = "test-set.csv"
+  if len(sys.argv) > 3 and sys.argv[3] != None:
+    testFilePath = os.path.abspath(sys.argv[3])
+  
+  classify(configFilePath, testFilePath)
 else:
-  print "Please enter a valid environment"
-  sys.exit(0)
+  print "Invalid option passed, please see README for usage"
+  sys.exit(1)
