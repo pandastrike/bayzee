@@ -27,7 +27,6 @@ class Generator:
     self.data_index = config["data"]["index"]
     self.data_fields = config["data"]["fields"]
     self.generator_fields = config["generator"]["fields"]
-    self.hasReference = False
     self.documentsSize = 0
     self.analyzerIndex = self.data_index + "__analysis__"
     self.analyzer_settings = {
@@ -65,22 +64,7 @@ class Generator:
       #initialize the elasticsearch
       if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
-      data = self.esClient.indices.create(self.analyzerIndex, self.analyzer_settings)
-
-      if "reference_index" in config and config["reference"]["index"] != None:
-        if "reference_type" in config:
-          if self.esClient.indices.exists(index=config["reference"]["index"]):
-            if self.esClient.indices.exists_type(index=config["reference"]["index"], doc_type=config["reference"]["type"]):
-              self.hasReference = True
-              self.reference_index = config["reference"]["index"]
-              self.reference_type = config["reference"]["type"]
-              self.reference_fields = config["reference"]["fields"]
-            else:
-              print "type ", config["reference"]["type"], " does not exist for index ", config["reference_index"], " in elasticsearch"
-          else:
-            print "index ", config["reference"]["index"], " does not exist in elasticsearch"
-        else:
-          print "type for index ", config["reference"]["index"], " does not exist in config file" 
+      data = self.esClient.indices.create(self.analyzerIndex, self.analyzer_settings) 
     except:
       error = sys.exc_info()
       print "Error occurred during initialization of analyzer index", error
@@ -191,40 +175,6 @@ class Generator:
           entry["max_term_frequency"] = floatPrecision.format(float(max_term_frequency))
         if "avg_term_frequency" in features:
           entry["avg_term_frequency"] = floatPrecision.format(float(avg_term_frequency))
-        
-        if self.hasReference:
-          permutations = self.__getPermutationsOfTokens(token.split(" "))
-          matchPhrases = map(lambda x: {"match_phrase":{"name": x}}, permutations)
-          query = {"bool":{"should":matchPhrases}}
-          data = self.esClient.count(index=self.reference_index, doc_type=self.reference_type, body=query)
-          if data["count"] > 0:
-            entry["phrase_matches_" + self.reference_type] = 1
-          else:
-            entry["phrase_matches_" + self.reference_type] = 0
-          count = 0
-          words = token.split(" ")
-          words = filter(lambda x: x not in esStopWords, words)
-          tokenLength = len(words)
-          if tokenLength > 0:
-            for word in token.split(" "):
-              query = {"query_string":{"fields":self.reference_fields, "query": word}}
-              data = self.esClient.count(index=self.reference_index, doc_type=self.reference_type, body=query)
-              count += data["count"] / tokenLength
-          entry[self.reference_type+"_similarity"] = count 
-
-  def __getPermutationsOfTokens(self, tokens):
-    buf = []
-    if len(tokens) == 1:
-      return tokens 
-    for i,token in enumerate(tokens):
-      remaining = []
-      remaining += tokens
-      remaining.pop(i)
-      subPermutations = self.__getPermutationsOfTokens(remaining)
-      for sub in subPermutations:
-        buf.append([token] + [sub])
-    buf = map(lambda x: " ".join(x), buf)
-    return buf
 
   def __writeToFile(self):
     trainingRows = {}
@@ -244,11 +194,6 @@ class Generator:
     holdOutFile = open(holdOutFile, "w")
     trainingOutFile = open(trainingOutFile, "w")
     testOutFile = open(testOutFile, "w")
-
-    #csv writers
-    if self.hasReference:
-      features.append("phrase_matches_" + self.reference_type)
-      features.append(self.reference_type+"_similarity")
 
     headers = ["m#document_id","m#phrase"] + features
     holdOutCSVWriter = csv.writer(holdOutFile)

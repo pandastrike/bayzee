@@ -7,11 +7,6 @@ data:
   type: "product"
   fields: ["name","category","description"]
 
-reference_data:
-  index:
-  type:
-  fields: ["name"]
-
 generator:
   max_shingle_size: 3
   min_shingle_size: 2

@@ -10,6 +10,7 @@ __name__ = "processor"
 class Processor:
 
   def __init__(self, config):
+    configFilePath = os.path.abspath(sys.argv[1])
     self.config = config
     self.esClient = Elasticsearch()
     self.documents = None
@@ -25,7 +26,7 @@ class Processor:
     processors = []
     
     for name, module in config["processors"]["modules"].iteritems():
-      modulePath = os.path.abspath(os.path.join(os.path.dirname(__file__),"..", module["path"]))
+      modulePath = os.path.abspath(os.path.join(configFilePath, module["path"]))
       processors.append({"config":module,"module":imp.load_source(module["name"], modulePath)})
       self.features += module["features"]
       if "es_field_name" in module:
