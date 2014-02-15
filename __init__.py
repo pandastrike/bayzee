@@ -38,7 +38,7 @@ def annotate(configFilePath):
 
   corpusIndexName = config["corpus"]["index"]
   corpusTypeName = config["corpus"]["type"]
-  corpusFields = config["corpus"]["fields"]
+  corpusFields = config["corpus"]["textFields"]
   processorIndexName = config["processor"]["index"]
   processorTypeName = config["processor"]["type"]
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))

@@ -27,8 +27,7 @@ class Generator:
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
-    self.corpusFields = config["corpus"]["fields"]
-    self.generatorFields = config["generator"]["fields"]
+    self.corpusFields = config["corpus"]["textFields"]
     self.corpusSize = 0
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
@@ -128,7 +127,7 @@ class Generator:
       token = shingle["token"]
       if token not in self.bagOfPhrases:
         entry = self.bagOfPhrases[token] = {}
-        shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.generatorFields)
+        shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.corpusFields)
         query = {"query":{"bool":{"should":shouldMatch}}}
         data = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body=query, explain=True, size=self.corpusSize)
         entry["max_score"] = 0

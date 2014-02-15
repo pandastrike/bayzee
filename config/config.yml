@@ -8,16 +8,16 @@ elasticsearch:
 # Corpus to use
 corpus:
   # name of the Elasticsearch index where the corpus is stored
-  index: "gluten_products"
+  index: "example_corpus"
   # name of the Elasticsearch document type where the corpus is stored
   type: "product"
   # list of document fields to generate phrases from
-  fields: ["name","category","description"]
+  textFields: ["name","description","category","manufacturer"]
 
 # Processors (add custom processors to list of modules)
 processor:
   # name of the Elasticsearch index where annotated text is stored by the processors
-  index: "gluten_products__annotated"
+  index: "example_corpus__annotated"
   # name of the Elasticsearch document type where annotated text is stored by the processors
   type: "product"
   # list of processor modules
@@ -52,8 +52,6 @@ generator:
   max_shingle_size: 3
   # minimum number of words in generated phrase
   min_shingle_size: 2
-  # list of document's fields to generate phrases from
-  fields: ["name","category","description","manufacturer"]
   # list of features to extract
   features:
     - name: "doc_count"
