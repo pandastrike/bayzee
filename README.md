@@ -10,11 +10,11 @@ Following is a high level description of how bayzee works:
 
 * #### Text Annotation
   Text content is pre-processed and annotated and annotated text is indexed in Elasticsearch.
-  Standard processor, provided with bayzee ('lib/pos-processor.py'), tags words of input text with parts-of-speech (POS Tags) using 'nltk'.
+  Standard processor, provided with bayzee ('lib/pos-processor.py'), tags text from the documents in corpus with parts-of-speech (POS Tags) using [NLTK](http://www.nltk.org).
   These POS tags (tuples of word and part-of-speech) are cached in Elasticsearch, so that bayzee doesn't need to annotate on every run.
 
 * #### Feature Extraction
-  Text content is analyzed to generate two-word and three-word shingles (phrases) that need to be tested for domain relevance.
+  Text content is analyzed to generate n-word shingles (phrases) that need to be tested for domain relevance.
   Elasticsearch's analyze API is used to generate shingles from text blocks.
   Features are then extracted from these phrases.
   Standard processor, provided with bayzee ('lib/pos-processor.py'), can extract following features for each phrase:
@@ -31,7 +31,7 @@ Following is a high level description of how bayzee works:
   * last_pos_tag: part-of-speech of the last word in the phrase
   * non_alpha_chars: number of non-alphabetic characters in the phrase
   
-  Numerical features are discretized using 'entropy discretization' method (from 'orange' package)
+  Numerical features are discretized using 'entropy discretization' method from ['orange' package](http://orange.biolab.si)
 
 * #### Phrase Classification
   A manually labelled training data set containing phrases labeled as relevant to domain ('1') or not relevant to domain ('0') is used to train a Naive Bayes classifier.
@@ -128,7 +128,14 @@ Following is a high level description of how bayzee works:
 ## Customization
 Although, bayzee's standard processor extracts a predefined set of features from text, it is possible to extend bayzee with a custom 'processor' that extracts custom features specific to the domain. Custom processors can be configured in the 'processors' section of the configuration file.
 
-## Running bayzee
+## Setup
+
+* Clone the repo
+* Install [NLTK](http://www.nltk.org/install.html)
+* Install [orange](http://orange.biolab.si/download)
+* Make sure Elasticsearch server is running and the corpus of documents are indexed in Elasticsearch
+
+## Run
 
 * First, annotate text
 
