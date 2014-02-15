@@ -20,15 +20,15 @@ Following is a high level description of how bayzee works:
   Standard processor, provided with bayzee ('lib/pos-processor.py'), can extract following features for each phrase:
   
   * doc_count: number of documents in the corpus that contain the phrase atleast once
-  * max_term_frequency: maximum number of times the phrase occurs in a document in the corpus
-  * avg_term_frequency: average number of times the phrase occurs in a document in the corpus
+  * max_term_frequency: maximum number of times the phrase occurs in any document in the corpus
+  * avg_term_frequency: average number of times the phrase occurs in the corpus
   * max_score: maximum value of TF-IDF score of the phrase across all the documents in the corpus
   * avg_score: average value of TF-IDF score of the phrase across all the documents in the corpus
   * avg_word_length: average length of words in the phrase
   * pos_tags: a string containing sequence of POS tags of words in the phrase
   * first_pos_tag: part-of-speech of the first word in the phrase
-  * middle_pos_tag: part-of-speech of the second word in the phrase
-  * last_pos_tag: part-of-speech of the second word in the phrase
+  * middle_pos_tag: part-of-speech of the middle word in the phrase
+  * last_pos_tag: part-of-speech of the last word in the phrase
   * non_alpha_chars: number of non-alphabetic characters in the phrase
   
   Numerical features are discretized using 'entropy discretization' method (from 'orange' package)
@@ -36,12 +36,12 @@ Following is a high level description of how bayzee works:
 * #### Phrase Classification
   A manually labelled training data set containing phrases labeled as relevant to domain ('1') or not relevant to domain ('0') is used to train a Naive Bayes classifier.
   Trained classifier is used to predict the probability of each phrase belonging to either of the two classes ('good' or 'bad').
-  A manually labelled hold-out data set containing phrases labeled as relevant to domain ('1') or not relevant to domain ('0') is used to evaluate accuracy of the classifier.
-  Six measures are computed for evaluation:
+  A manually labelled hold-out data set containing phrases labelled as relevant to domain ('1') or not relevant to domain ('0') is used to evaluate accuracy of the classifier.
+  Six measures are computed to evaluate classifier accuracy:
   
   * 'Precision of Good': (# of phrases correctly classified as 'good' / Total # of phrases classified as 'good')
   * 'Recall of Good': (# of phrases correctly classified as 'good' / Total # of 'good' phrases in hold-out)
-  * 'Balanced F-measure of Good': 2 * 'Precision of Bad' * 'Recall of Good' / ('Precision of Good' + 'Recall of Good')
+  * 'Balanced F-measure of Good': 2 * 'Precision of Good' * 'Recall of Good' / ('Precision of Good' + 'Recall of Good')
   * 'Precision of Bad': (# of phrases correctly classified as 'bad' / Total # of phrases classified as 'bad')
   * 'Recall of Bad': (# of phrases correctly classified as 'bad' / Total # of 'bad' phrases in hold-out)
   * 'Balanced F-measure of Bad': 2 * 'Precision of Bad' * 'Recall of Bad' / ('Precision of Bad' + 'Recall of Bad')
