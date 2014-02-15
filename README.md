@@ -10,14 +10,14 @@ Following is a high level description of how bayzee works:
 
 * #### Text Annotation
   Text content is pre-processed and annotated and annotated text is indexed in Elasticsearch.
-  Standard processor, provided with bayzee ('lib/pos-processor.py'), tags text from the documents in corpus with parts-of-speech (POS Tags) using [NLTK](http://www.nltk.org).
+  Standard processor, provided with bayzee, [pos-processor](./lib/pos-processor.py), tags text from the documents in corpus with parts-of-speech (POS Tags) using [NLTK](http://www.nltk.org).
   These POS tags (tuples of word and part-of-speech) are cached in Elasticsearch, so that bayzee doesn't need to annotate on every run.
 
 * #### Feature Extraction
   Text content is analyzed to generate n-word shingles (phrases) that need to be tested for domain relevance.
   Elasticsearch's analyze API is used to generate shingles from text blocks.
   Features are then extracted from these phrases.
-  Standard processor, provided with bayzee ('lib/pos-processor.py'), can extract following features for each phrase:
+  Standard processor, provided with bayzee, [pos-processor](./lib/pos-processor.py), can extract following features for each phrase:
   
   * doc_count: number of documents in the corpus that contain the phrase atleast once
   * max_term_frequency: maximum number of times the phrase occurs in any document in the corpus
@@ -126,7 +126,21 @@ Following is a high level description of how bayzee works:
   ```
 
 ## Customization
-Although, bayzee's standard processor extracts a predefined set of features from text, it is possible to extend bayzee with a custom 'processor' that extracts custom features specific to the domain. Custom processors can be configured in the 'processors' section of the configuration file.
+Although, bayzee's standard processor extracts a predefined set of features from text, it is possible to extend bayzee with a custom 'processor' that extracts custom features specific to the domain. Custom processors can be configured in the 'processors' section of the configuration file. Any custom processor module should implement the following two functions:
+
+        annotateDocument(config, document, fields, annotatedDocument), where 
+        addFeatures(config, phrase, features, annotatedDocument)
+        
+where:
+
+        'config' is a dictionary object containing configuration elements
+        'document' is a dictionary object containing data that needs to be annotated
+        'fields' is a list of document fields
+        'annotatedDocument' is a dictionary object containing annotated data
+        'phrase' is the phrase for which features need to be extracted
+        'features' is a dictionary object containing the configured features
+
+See [pos-processor](./lib/pos-processor.py) for an example processor implementation.
 
 ## Setup
 
