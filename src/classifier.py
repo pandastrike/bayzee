@@ -7,7 +7,6 @@ import pickle
 import nltk
 import time
 from elasticsearch import Elasticsearch
-from lib import processor
 
 __name__ = "classifier"
 
