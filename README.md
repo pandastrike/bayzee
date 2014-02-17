@@ -128,7 +128,7 @@ Following is a high level description of how bayzee works:
 ## Customization
 Although, bayzee's standard processor extracts a predefined set of features from text, it is possible to extend bayzee with a custom 'processor' that extracts custom features specific to the domain. Custom processors can be configured in the 'processors' section of the configuration file. Any custom processor module should implement the following two functions:
 
-        annotateDocument(config, document, fields, annotatedDocument), where 
+        annotateDocument(config, document, fields, annotatedDocument) 
         addFeatures(config, phrase, features, annotatedDocument)
         
 where:
