@@ -5,6 +5,8 @@ import imp
 from src import classifier,generator
 from elasticsearch import Elasticsearch
 
+__name__ = "bayzee"
+
 def __loadConfig(configFilePath):
   config = None
   if not os.path.exists(configFilePath):
