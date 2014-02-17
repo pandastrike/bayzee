@@ -56,20 +56,20 @@ Following is a high level description of how bayzee works:
     host: "127.0.0.1"
     # port on which Elasticsearch server is listening
     port: 9200
-
+  
   # Corpus to use
   corpus:
     # name of the Elasticsearch index where the corpus is stored
-    index: "example"
+    index: "example_corpus"
     # name of the Elasticsearch document type where the corpus is stored
     type: "product"
     # list of document fields to generate phrases from
-    fields: ["name","category","description"]
-
+    textFields: ["name","description","category","manufacturer"]
+  
   # Processors (add custom processors to list of modules)
   processor:
     # name of the Elasticsearch index where annotated text is stored by the processors
-    index: "example__annotated"
+    index: "example_corpus__annotated"
     # name of the Elasticsearch document type where annotated text is stored by the processors
     type: "product"
     # list of processor modules
@@ -93,7 +93,7 @@ Following is a high level description of how bayzee works:
             is_numerical: True
           - name: "non_alpha_chars"
             is_numerical: True
-
+  
   # Generation
   generator:
     # training set file path (relative to the location of this config file)
@@ -104,8 +104,6 @@ Following is a high level description of how bayzee works:
     max_shingle_size: 3
     # minimum number of words in generated phrase
     min_shingle_size: 2
-    # list of document's fields to generate phrases from
-    fields: ["name","category","description","manufacturer"]
     # list of features to extract
     features:
       - name: "doc_count"
@@ -120,7 +118,7 @@ Following is a high level description of how bayzee works:
         is_numerical: True
     # precision of numerical features
     float_precision: 4
-
+  
   # output directory (relative to the location of this config file)
   output_path: "../data"
   ```
