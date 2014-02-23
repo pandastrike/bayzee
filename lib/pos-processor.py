@@ -62,6 +62,9 @@ def annotateDocument(config, document, fields, annotatedDocument):
   annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
   print "Annotated document " + document["_id"]
 
+def getFeatures(config, phrase, features):
+  return 
+  
 def addFeatures(config, phrase, features, annotatedDocument):
   posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
   phrase = phrase.replace("\"", "")
