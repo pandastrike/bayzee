@@ -2,8 +2,10 @@ import sys
 import yaml
 import os
 import imp
-from src import classifier,generator
+from src import classifier,generator,annotator
 from elasticsearch import Elasticsearch
+import csv
+import httplib
 
 __name__ = "bayzee"
 
@@ -37,32 +39,10 @@ def __getDataDir(configFilePath, config):
 
 def annotate(configFilePath):
   config = __loadConfig(configFilePath)
-
-  corpusIndexName = config["corpus"]["index"]
-  corpusTypeName = config["corpus"]["type"]
-  corpusFields = config["corpus"]["textFields"]
-  processorIndexName = config["processor"]["index"]
-  processorTypeName = config["processor"]["type"]
-  esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
-  if esClient.indices.exists(index=processorIndexName):
-    esClient.indices.delete(index=processorIndexName)
-  esClient.indices.create(index=processorIndexName)
-
-  count = esClient.count(index=corpusIndexName, doc_type=corpusTypeName, body={"match_all":{}})
-  count = count["count"]
-  documents = esClient.search(index=corpusIndexName, doc_type=corpusTypeName, body={"query":{"match_all":{}}, "size":count}, fields=corpusFields)
-
   __loadProcessors(configFilePath, config)
-
-  print "Annotating " + str(count) + " documents..."
-
-  for hit in documents["hits"]["hits"]:
-    document = hit["fields"]
-    document["_id"] = hit["_id"]
-    annotatedDocument = {}
-    for processorInstance in config["processor_instances"]:
-      processorInstance.annotateDocument(config, document, corpusFields, annotatedDocument)
-    esClient.index(index=processorIndexName, doc_type=processorTypeName, id=document["_id"], body=annotatedDocument)
+  dataDir = __getDataDir(configFilePath, config)
+  ann = annotator.Annotator(config, dataDir)
+  ann.annotate()
 
 def generate(configFilePath):
   config = __loadConfig(configFilePath)
