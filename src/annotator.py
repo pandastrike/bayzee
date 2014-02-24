@@ -1,14 +1,9 @@
-import csv
-import nltk
-import math
-import orange
 import sys
 import os
 import os.path
 import yaml
 import json
 import re
-from nltk.corpus import conll2000
 from elasticsearch import Elasticsearch
 from time import sleep
 
@@ -76,8 +71,9 @@ class Annotator:
 
   def annotate(self):
     self.__indexPhrases()
-    self.__annotateDocuments()
-    self.__getFeatures()
+    print "Annotating documents and phrases..."
+    for processorInstance in self.config["processor_instances"]:
+      processorInstance.annotate(self.config)
     self.__deleteAnalyzerIndex()
 
   def __keify(self, phrase):
@@ -141,28 +137,6 @@ class Annotator:
     for key in self.bagOfPhrases:
       data = self.bagOfPhrases[key]
       self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
-
-  def __annotateDocuments(self):
-    print "Annotating " + str(len(self.documents["hits"]["hits"])) + " documents..."
-
-    for hit in self.documents["hits"]["hits"]:
-      document = hit["fields"]
-      document["_id"] = hit["_id"]
-      annotatedDocument = {}
-      for processorInstance in self.config["processor_instances"]:
-        processorInstance.annotateDocument(self.config, document, self.corpusFields, annotatedDocument)
-      self.esClient.index(index=self.processorIndex, doc_type=self.processorType, id=document["_id"], body=annotatedDocument)
-
-  def __getFeatures(self):
-    for key in self.bagOfPhrases:
-      phraseData = self.bagOfPhrases[key]
-      phrase = phraseData["phrase"]
-      features = {}
-      features.update(phraseData)
-      for processorInstance in self.config["processor_instances"]:
-        processorInstance.getFeatures(self.config, phrase, features)
-      if features != None:
-        self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=features)
 
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):

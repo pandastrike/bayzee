@@ -1,18 +1,11 @@
 import csv
-import nltk
-import math
-import orange
 import sys
 import os
 import os.path
-import yaml
 import json
 import re
-from nltk.corpus import conll2000
 from elasticsearch import Elasticsearch
 from time import sleep
-
-esStopWords = ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"]
 
 __name__ = "generator"
 
@@ -63,47 +56,15 @@ class Generator:
     for module in config["processor"]["modules"]:
       self.featureNames = self.featureNames + map(lambda x: x["name"], module["features"])
 
-    try:
-      if self.esClient.indices.exists(self.analyzerIndex):
-        self.esClient.indices.delete(self.analyzerIndex)
-      data = self.esClient.indices.create(self.analyzerIndex, self.analyzerSettings) 
-    except:
-      error = sys.exc_info()
-      print "Error occurred during initialization of analyzer index", error
-      sys.exit(1)
-    else:
-      sleep(1)
-
   def generate(self):
-    self.__addFeatures()
+    self.__extractFeatures()
     self.__writeToFile()
 
-  def __replaceUnderscore(self,shingle):
-    token = shingle["token"]
-    token = token.replace("_","")
-    token = re.sub('\s+', ' ', token).strip()
-    shingle["token"] = token
-    return shingle
-    
-  def __filterTokens(self, shingle):
-    global esStopWords
-    tokens = shingle["token"].split(" ")
-    firstToken = tokens[0]
-    lastToken = tokens[-1]
-    isValid = True
-    isValid = (isValid and lastToken != None)
-    isValid = (isValid and len(lastToken) > 1)
-    isValid = (isValid and not firstToken.replace(".","",1).isdigit())
-    isValid = (isValid and not lastToken.replace(".","",1).isdigit())
-    isValid = (isValid and firstToken not in esStopWords)
-    isValid = (isValid and lastToken not in esStopWords)
-    return isValid
-
-  def __addFeatures(self):
-    processorIndexName = self.config["processor"]["index"]
-    processorTypeName = self.config["processor"]["type"]+"__phrase"
-    phrasesCount = self.esClient.count(index=processorIndexName, doc_type=processorTypeName, body={"match_all":{}})
-    phrases = self.esClient.search(index=processorIndexName, doc_type=processorTypeName, body={"query":{"match_all":{}}, "size":phrasesCount["count"]})
+  def __extractFeatures(self):
+    processorIndex = self.config["processor"]["index"]
+    phraseProcessorType = self.config["processor"]["type"]+"__phrase"
+    phrasesCount = self.esClient.count(index=processorIndex, doc_type=phraseProcessorType, body={"match_all":{}})
+    phrases = self.esClient.search(index=processorIndex, doc_type=phraseProcessorType, body={"query":{"match_all":{}}, "size":phrasesCount["count"]})
     floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
     print "Generating phrases and their features from " + str(len(phrases["hits"]["hits"])) + " documents..."
     for phraseData in phrases["hits"]["hits"]:
@@ -159,10 +120,9 @@ class Generator:
       if "avg_term_frequency" in self.featureNames:
         entry["avg_term_frequency"] = floatPrecision.format(float(avgTermFrequency))
 
-      # get additional features
-      annotatedDocument = self.esClient.get(index=self.processorIndex,doc_type=self.processorType,id=documentId)["_source"]
-      for processorInstance in self.config["processor_instances"]:
-        processorInstance.addFeatures(self.config, token, entry, annotatedDocument)
+    # get additional features
+    for processorInstance in self.config["processor_instances"]:
+      processorInstance.extractFeatures(self.config, self.bagOfPhrases)
         
   def __writeToFile(self):
     #output files
@@ -199,9 +159,3 @@ class Generator:
         row.append(int(self.holdOutDataset[phrase]))
         holdOutCSVWriter.writerow(row)
         row.pop()
-
-  def __deleteAnalyzerIndex(self):
-    if self.esClient.indices.exists(self.analyzerIndex):
-        self.esClient.indices.delete(self.analyzerIndex)
-    if os.path.exists(self.dataDir + "/classifier.pickle"):
-      os.remove(self.dataDir + "/classifier.pickle")

@@ -1,7 +1,6 @@
 import csv
 import nltk
 import math
-import orange
 import sys
 import os.path
 import imp
@@ -39,80 +38,102 @@ class UnigramChunker(nltk.ChunkParserI):
 train_sents = conll2000.chunked_sents('train.txt')
 chunker = UnigramChunker(train_sents)
 
-def annotateDocument(config, document, fields, annotatedDocument):
-  content = ""
-  for field in fields:
-    if type(document[field]) is list:
-      for element in document[field]:
-        content += element + "."
-    else:
-      content += document[field] + "."
-
-  sentences = nltk.sent_tokenize(content)
-  posTaggedSentences = []
-  for sentence in sentences:
-    sentence = sentence.strip()
-    if len(sentence) > 1:
-      sentence = sentence.replace("-", " ")
-      sentenceWords = nltk.word_tokenize(sentence.lower())
-      sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
-      posTags = nltk.pos_tag(sentenceWords)
-      posTaggedSentences.append(posTags)
-
-  annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
-  print "Annotated document " + document["_id"]
-
-def getFeatures(config, phrase, features):
-  return 
-  
-def addFeatures(config, phrase, features, annotatedDocument):
-  posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
-  phrase = phrase.replace("\"", "")
-  phraseWords = nltk.word_tokenize(phrase)
-  foundMatch = True
-  for sentencePosTags in posTaggedSentences:
-    posTagString = firstPosTag = middlePosTag = lastPosTag = "X"
-    for i, sentencePosTag in enumerate(sentencePosTags):
-      if sentencePosTag[1][0:2] == "PO" or sentencePosTag[0] != phraseWords[0] or (i > len(sentencePosTags) - len(phraseWords)):
-        foundMatch = False
-        continue
-      posTagString = firstPosTag = sentencePosTag[1][0:2]
-      for j, phraseWord in enumerate(phraseWords[1:]):
-        if sentencePosTags[i+j+1][0] != phraseWord:
-          break
-        posTag = sentencePosTags[i+j+1][1][0:2]
-        if posTag != "PO":
-          posTagString += posTag
-          if len(phraseWords) > 2 and middlePosTag == "X":
-            middlePosTag = posTag
-          elif j == len(phraseWords) - 2 and lastPosTag == "X":
-            lastPosTag = posTag
-      if lastPosTag != "X":
-        foundMatch = True
-        break
+def annotate(config):
+  esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
+  corpusIndex = config["corpus"]["index"]
+  corpusType = config["corpus"]["type"]
+  corpusFields = config["corpus"]["textFields"]
+  processorIndex = config["processor"]["index"]
+  processorType = config["processor"]["type"]
+  count = esClient.count(index=corpusIndex, doc_type=corpusType, body={"match_all":{}})
+  corpusSize = count["count"]
+  documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"query":{"match_all":{}}, "size":corpusSize}, fields=corpusFields)
+  print "Generating phrases and their features from " + str(corpusSize) + " documents..."
+  for document in documents["hits"]["hits"]:
+    content = ""
+    for field in corpusFields:
+      if type(document["fields"][field]) is list:
+        for element in document["fields"][field]:
+          content += element + "."
       else:
-        foundMatch = False
-    if foundMatch:
-      break
-  if not foundMatch:
-    posTagString = "X"
+        content += document["fields"][field] + "."
+      
+    annotatedDocument = {}
+    sentences = nltk.sent_tokenize(content)
+    posTaggedSentences = []
+    for sentence in sentences:
+      sentence = sentence.strip()
+      if len(sentence) > 1:
+        sentence = sentence.replace("-", " ")
+        sentenceWords = nltk.word_tokenize(sentence.lower())
+        sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
+        posTags = nltk.pos_tag(sentenceWords)
+        posTaggedSentences.append(posTags)
+    if esClient.exists(index=processorIndex, doc_type=processorType, id=document["_id"]):
+      annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
+    annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
+    esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
+    print "Annotated document " + document["_id"]
 
-  # average word length as a feature
-  totalWordLength = 0
-  for word in phraseWords:
-    totalWordLength += len(word)
-  averageWordlength = round(totalWordLength * 1.0/len(phraseWords),2)
+def extractFeatures(config, phraseFeatureDict):
 
-  # non alphabet characters in phrase as a feature
-  phraseString = phrase.replace(" ", "")
-  nonAlphaChars = 0
-  for char in phraseString:
-    if char.isalpha() == False and char != "'":
-      nonAlphaChars += 1
-  
-  features["pos_tags"] = posTagString
-  features["first_pos_tag"] = firstPosTag
-  features["middle_pos_tag"] = middlePosTag
-  features["last_pos_tag"] = lastPosTag
-  features["avg_word_length"] = str(averageWordlength)
-  features["non_alpha_chars"] = str(nonAlphaChars)
+  processorIndex = config["processor"]["index"]
+  processorType = config["processor"]["type"]
+  phraseProcessorType = config["processor"]["type"] + "__phrase"
+  esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
+  for phrase in phraseFeaturesDict:
+    features = phrasesDict[phrase]
+    phraseData = esClient.get(index=processorIndex, doc_type=phraseProcessorType, id=__keify(phrase))["source"]
+    documentId = phraseData["document_id"]
+    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=__keify(phrase))["source"]
+    posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
+    phrase = phraseData["phrase"]
+    phrase = phrase.replace("\"", "")
+    phraseWords = nltk.word_tokenize(phrase)
+    foundMatch = True
+    for sentencePosTags in posTaggedSentences:
+      posTagString = firstPosTag = middlePosTag = lastPosTag = "X"
+      for i, sentencePosTag in enumerate(sentencePosTags):
+        if sentencePosTag[1][0:2] == "PO" or sentencePosTag[0] != phraseWords[0] or (i > len(sentencePosTags) - len(phraseWords)):
+          foundMatch = False
+          continue
+        posTagString = firstPosTag = sentencePosTag[1][0:2]
+        for j, phraseWord in enumerate(phraseWords[1:]):
+          if sentencePosTags[i+j+1][0] != phraseWord:
+            break
+          posTag = sentencePosTags[i+j+1][1][0:2]
+          if posTag != "PO":
+            posTagString += posTag
+            if len(phraseWords) > 2 and middlePosTag == "X":
+              middlePosTag = posTag
+            elif j == len(phraseWords) - 2 and lastPosTag == "X":
+              lastPosTag = posTag
+        if lastPosTag != "X":
+          foundMatch = True
+          break
+        else:
+          foundMatch = False
+      if foundMatch:
+        break
+    if not foundMatch:
+      posTagString = "X"
+
+    # average word length as a feature
+    totalWordLength = 0
+    for word in phraseWords:
+      totalWordLength += len(word)
+    averageWordlength = round(totalWordLength * 1.0/len(phraseWords),2)
+
+    # non alphabet characters in phrase as a feature
+    phraseString = phrase.replace(" ", "")
+    nonAlphaChars = 0
+    for char in phraseString:
+      if char.isalpha() == False and char != "'":
+        nonAlphaChars += 1
+    
+    features["pos_tags"] = posTagString
+    features["first_pos_tag"] = firstPosTag
+    features["middle_pos_tag"] = middlePosTag
+    features["last_pos_tag"] = lastPosTag
+    features["avg_word_length"] = str(averageWordlength)
+    features["non_alpha_chars"] = str(nonAlphaChars)
