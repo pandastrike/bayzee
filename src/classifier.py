@@ -12,13 +12,12 @@ __name__ = "classifier"
 
 class Classifier:
 
-  def __init__(self, config, dataDir, testFilePath):
+  def __init__(self, config, dataDir):
     self.config = config
     self.dataDir = dataDir
     self.classifierFilePath = self.dataDir + "/classifier.pickle"
     self.trainD = None
     self.classifier = None
-    self.testFilePath = testFilePath
     self.features = self.config["generator"]["features"]
     for module in self.config["processor"]["modules"]:
       self.features = self.features + module["features"]
@@ -30,43 +29,42 @@ class Classifier:
       self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
       self.__train()
 
-    if os.path.exists(self.classifierFilePath) and self.testFilePath != None and os.path.exists(self.testFilePath):
-      self.trainD = self.__loadDataFromCSV(self.dataDir + "/training-set.csv", "train", None)
-      testD = self.__loadDataFromCSV(self.testFilePath, "test", self.trainD.domain)
-      
-      self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
-      testD = orange.ExampleTable(self.trainD.domain, testD)
+    self.trainD = self.__loadDataFromCSV(self.dataDir + "/training-set.csv", "train", None)
+    testD = self.__loadDataFromCSV(self.dataDir + "/test-set.csv", "test", self.trainD.domain)
+    
+    self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
+    testD = orange.ExampleTable(self.trainD.domain, testD)
 
-      classifierFile = open(self.classifierFilePath)
-      self.classifier = pickle.load(classifierFile)
-      classifierFile.close()
+    classifierFile = open(self.classifierFilePath)
+    self.classifier = pickle.load(classifierFile)
+    classifierFile.close()
 
-      print("Classifying " + str(len(testD)) + " phrases with Naive Bayes Classifier...")
-      goodData = []
-      badData = []
-      for row in testD:
-        phrase = row.getmetas().values()[0].value
-        featureSet = {}
-        for i,feature in enumerate(self.features):
-          featureSet[feature["name"]] = row[i].value
+    print("Classifying " + str(len(testD)) + " phrases with Naive Bayes Classifier...")
+    goodData = []
+    badData = []
+    for row in testD:
+      phrase = row.getmetas().values()[0].value
+      featureSet = {}
+      for i,feature in enumerate(self.features):
+        featureSet[feature["name"]] = row[i].value
 
-        prob = self.classifier.prob_classify(featureSet).prob("1")
-        classType = self.classifier.classify(featureSet)
+      prob = self.classifier.prob_classify(featureSet).prob("1")
+      classType = self.classifier.classify(featureSet)
 
-        if classType == "1":
-          goodData.append(tuple([phrase] + [featureSet[feature["name"]] for feature in self.features] + [prob]))
-        else:
-          badData.append(tuple([phrase] + [featureSet[feature["name"]] for feature in self.features] + [1-prob]))
+      if classType == "1":
+        goodData.append(tuple([phrase] + [featureSet[feature["name"]] for feature in self.features] + [prob]))
+      else:
+        badData.append(tuple([phrase] + [featureSet[feature["name"]] for feature in self.features] + [1-prob]))
 
-      with open(self.dataDir + "/good-phrases.csv","a") as out:
-        csvOut = csv.writer(out)
-        for row in goodData:
-          csvOut.writerow(row)
+    with open(self.dataDir + "/good-phrases.csv","a") as out:
+      csvOut = csv.writer(out)
+      for row in goodData:
+        csvOut.writerow(row)
 
-      with open(self.dataDir + "/bad-phrases.csv","a") as out:
-        csvOut = csv.writer(out)
-        for row in badData:
-          csvOut.writerow(row)
+    with open(self.dataDir + "/bad-phrases.csv","a") as out:
+      csvOut = csv.writer(out)
+      for row in badData:
+        csvOut.writerow(row)
 
     self.__calculateMeasures()
 

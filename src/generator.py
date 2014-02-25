@@ -70,7 +70,7 @@ class Generator:
     for phraseData in phrases["hits"]["hits"]:
       token = phraseData["_source"]["phrase"]
       documentId = phraseData["_source"]["document_id"]
-      print "Adding features for phrase ", token
+      print "Extracted common features for phrase '" + token + "'"
       entry = self.bagOfPhrases[token] = {}
       shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.corpusFields)
       query = {"query":{"bool":{"should":shouldMatch}}}
