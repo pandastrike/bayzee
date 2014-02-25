@@ -70,13 +70,13 @@ class Annotator:
       sleep(1)
 
   def annotate(self):
-    self.__indexPhrases()
     print "Annotating documents and phrases..."
+    self.__indexPhrases()
     for processorInstance in self.config["processor_instances"]:
       processorInstance.annotate(self.config)
     self.__deleteAnalyzerIndex()
 
-  def __keify(self, phrase):
+  def __keyify(self, phrase):
     phrase = phrase.strip()
     if len(phrase) == 0:
       return ""
@@ -111,7 +111,6 @@ class Annotator:
     count = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"match_all":{}})
     self.corpusSize = count["count"]
     self.documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}, "size":self.corpusSize}, fields=self.corpusFields)
-    print "Generating phrases and their features from " + str(self.corpusSize) + " documents..."
     for document in self.documents["hits"]["hits"]:
       for field in self.corpusFields:
         shingles = []
@@ -128,11 +127,10 @@ class Annotator:
         if shingles != None and len(shingles) > 0:
           for shingle in shingles:
             phrase = shingle["token"]
-            key = self.__keify(phrase)
+            key = self.__keyify(phrase)
             if len(key) > 0:
               if key not in self.bagOfPhrases:
                 self.bagOfPhrases[key] = {"phrase": phrase, "document_id": document["_id"]}
-      print "Generated from", document["_id"]
     
     for key in self.bagOfPhrases:
       data = self.bagOfPhrases[key]

@@ -66,7 +66,7 @@ class Generator:
     phrasesCount = self.esClient.count(index=processorIndex, doc_type=phraseProcessorType, body={"match_all":{}})
     phrases = self.esClient.search(index=processorIndex, doc_type=phraseProcessorType, body={"query":{"match_all":{}}, "size":phrasesCount["count"]})
     floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
-    print "Generating phrases and their features from " + str(len(phrases["hits"]["hits"])) + " documents..."
+    print "Generating features from " + str(len(phrases["hits"]["hits"])) + " documents..."
     for phraseData in phrases["hits"]["hits"]:
       token = phraseData["_source"]["phrase"]
       documentId = phraseData["_source"]["document_id"]

@@ -58,7 +58,7 @@ def annotate(config):
   count = esClient.count(index=corpusIndex, doc_type=corpusType, body={"match_all":{}})
   corpusSize = count["count"]
   documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"query":{"match_all":{}}, "size":corpusSize}, fields=corpusFields)
-  print "Generating phrases and their features from " + str(corpusSize) + " documents..."
+
   for document in documents["hits"]["hits"]:
     content = ""
     for field in corpusFields:
@@ -83,7 +83,7 @@ def annotate(config):
       annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
     annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
     esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
-    print "Annotated document " + document["_id"]
+    print "pos-processor: Annotated document '" + document["_id"] + "'"
 
 def extractFeatures(config, phraseFeaturesDict):
 
@@ -147,3 +147,5 @@ def extractFeatures(config, phraseFeaturesDict):
     features["last_pos_tag"] = lastPosTag
     features["avg_word_length"] = str(averageWordlength)
     features["non_alpha_chars"] = str(nonAlphaChars)
+
+    print "pos-processor: Extracted features for '" + phrase + "'"
