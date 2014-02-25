@@ -73,7 +73,7 @@ def classify(configFilePath, testFilePath):
   dataDir = __getDataDir(configFilePath, config)
 
   if testFilePath == None:
-    testFilePath = dataDir + "test-set.csv"
+    testFilePath = dataDir + "/test-set.csv"
 
   cls = classifier.Classifier(config, dataDir, testFilePath)
   cls.classify()

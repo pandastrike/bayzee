@@ -58,12 +58,12 @@ class Classifier:
         else:
           badData.append(tuple([phrase] + [featureSet[feature["name"]] for feature in self.features] + [1-prob]))
 
-      with open(self.outputFile + "/good-phrases.csv","a") as out:
+      with open(self.outputFilePath + "/good-phrases.csv","a") as out:
         csvOut = csv.writer(out)
         for row in goodData:
           csvOut.writerow(row)
 
-      with open(self.outputFile + "/bad-phrases.csv","a") as out:
+      with open(self.outputFilePath + "/bad-phrases.csv","a") as out:
         csvOut = csv.writer(out)
         for row in badData:
           csvOut.writerow(row)

@@ -12,6 +12,16 @@ __name__ = "pos_processor"
 def trim(value) :
   return value.strip()
 
+def __keyify(phrase):
+  phrase = phrase.strip()
+  if len(phrase) == 0:
+    return ""
+  key = re.sub("[^A-Za-z0-9]", " ", phrase)
+  key = " ".join(phrase.split())
+  key = key.lower()
+  key = "-".join(phrase.split())
+  return key
+  
 def getChunkSequence(tree):
   sequence = ""
   for i in range(0,len(tree)):
@@ -75,17 +85,17 @@ def annotate(config):
     esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
     print "Annotated document " + document["_id"]
 
-def extractFeatures(config, phraseFeatureDict):
+def extractFeatures(config, phraseFeaturesDict):
 
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
   phraseProcessorType = config["processor"]["type"] + "__phrase"
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
   for phrase in phraseFeaturesDict:
-    features = phrasesDict[phrase]
+    features = phraseFeaturesDict[phrase]
     phraseData = esClient.get(index=processorIndex, doc_type=phraseProcessorType, id=__keify(phrase))["source"]
     documentId = phraseData["document_id"]
-    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=__keify(phrase))["source"]
+    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=documentId)["source"]
     posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
     phrase = phraseData["phrase"]
     phrase = phrase.replace("\"", "")
