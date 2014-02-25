@@ -1,4 +1,5 @@
 import csv
+import re
 import nltk
 import math
 import sys
@@ -93,9 +94,9 @@ def extractFeatures(config, phraseFeaturesDict):
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
   for phrase in phraseFeaturesDict:
     features = phraseFeaturesDict[phrase]
-    phraseData = esClient.get(index=processorIndex, doc_type=phraseProcessorType, id=__keify(phrase))["source"]
+    phraseData = esClient.get(index=processorIndex, doc_type=phraseProcessorType, id=__keyify(phrase))["_source"]
     documentId = phraseData["document_id"]
-    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=documentId)["source"]
+    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=documentId)["_source"]
     posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
     phrase = phraseData["phrase"]
     phrase = phrase.replace("\"", "")
