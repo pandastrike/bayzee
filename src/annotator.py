@@ -139,5 +139,3 @@ class Annotator:
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
-    if os.path.exists(self.dataDir + "/classifier.pickle"):
-      os.remove(self.dataDir + "/classifier.pickle")
