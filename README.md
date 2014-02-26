@@ -126,17 +126,13 @@ Following is a high level description of how bayzee works:
 ## Customization
 Although, bayzee's standard processor extracts a predefined set of features from text, it is possible to extend bayzee with a custom 'processor' that extracts custom features specific to the domain. Custom processors can be configured in the 'processors' section of the configuration file. Any custom processor module should implement the following two functions:
 
-        annotateDocument(config, document, fields, annotatedDocument) 
-        addFeatures(config, phrase, features, annotatedDocument)
+        annotate(config) 
+        extractFeatures(config, phraseFeaturesDict)
         
 where:
 
         'config' is a dictionary object containing configuration elements
-        'document' is a dictionary object containing data that needs to be annotated
-        'fields' is a list of document fields
-        'annotatedDocument' is a dictionary object containing annotated data
-        'phrase' is the phrase for which features need to be extracted
-        'features' is a dictionary object containing the configured features
+        'phraeFeaturesDict' is a dictionary object containing the configured features for each phrase as key
 
 See [pos-processor](./lib/pos-processor.py) for an example processor implementation.
 
