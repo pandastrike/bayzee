@@ -55,6 +55,18 @@ class Generator:
     self.featureNames = map(lambda x: x["name"], config["generator"]["features"])
     for module in config["processor"]["modules"]:
       self.featureNames = self.featureNames + map(lambda x: x["name"], module["features"])
+    if os.path.exists(self.dataDir + "/classifier.pickle"):
+      os.remove(self.dataDir + "/classifier.pickle")
+    if os.path.exists(self.dataDir + "/bad-phrases.csv"):
+      os.remove(self.dataDir + "/bad-phrases.csv")
+    if os.path.exists(self.dataDir + "/good-phrases.csv"):
+      os.remove(self.dataDir + "/good-phrases.csv")
+    if os.path.exists(self.dataDir + "/hold-out-set.csv"):
+      os.remove(self.dataDir + "/hold-out-set.csv")
+    if os.path.exists(self.dataDir + "/test-set.csv"):
+      os.remove(self.dataDir + "/test-set.csv")
+    if os.path.exists(self.dataDir + "/training-set.csv"):
+      os.remove(self.dataDir + "/training-set.csv")
 
   def generate(self):
     self.__extractFeatures()
