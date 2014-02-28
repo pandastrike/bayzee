@@ -108,7 +108,7 @@ class Annotator:
     return isValid
 
   def __indexPhrases(self):
-    count = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"match_all":{}})
+    count = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}})
     self.corpusSize = count["count"]
     self.documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}, "size":self.corpusSize}, fields=self.corpusFields)
     for document in self.documents["hits"]["hits"]:

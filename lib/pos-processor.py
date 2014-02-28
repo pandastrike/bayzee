@@ -56,7 +56,7 @@ def annotate(config):
   corpusFields = config["corpus"]["textFields"]
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
-  count = esClient.count(index=corpusIndex, doc_type=corpusType, body={"match_all":{}})
+  count = esClient.count(index=corpusIndex, doc_type=corpusType, body={"query":{"match_all":{}}})
   corpusSize = count["count"]
   documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"query":{"match_all":{}}, "size":corpusSize}, fields=corpusFields)
 
