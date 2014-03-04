@@ -66,6 +66,8 @@ generator:
       is_numerical: True
   # precision of numerical features
   float_precision: 4
+  # number of documents to process at a time
+  processingPageSize: 100
 
 # output directory (relative to the location of this config file)
 output_path: "../data"

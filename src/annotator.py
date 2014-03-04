@@ -26,7 +26,8 @@ class Annotator:
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
     self.analyzerIndex = self.corpusIndex + "__analysis__"
-    self.analyzerSettings = {
+    
+    analyzerIndexSettings = {
       "index":{
         "analysis":{
           "analyzer":{
@@ -50,6 +51,13 @@ class Annotator:
         }
       }
     }
+    analyzerIndexTypeMapping = {
+      "properties":{
+        "phrase":{"type":"string"},
+        "document_id":{"type":"string"},
+        "phrase__not_analyzed":{"type":"string","index":"not_analyzed"}
+      }
+    }
 
     self.featureNames = map(lambda x: x["name"], config["generator"]["features"])
     for module in config["processor"]["modules"]:
@@ -59,9 +67,10 @@ class Annotator:
       if self.esClient.indices.exists(self.config["processor"]["index"]):
         self.esClient.indices.delete(self.config["processor"]["index"])
       self.esClient.indices.create(self.config["processor"]["index"])
+      self.esClient.indices.put_mapping(self.processorPhraseType,analyzerIndexTypeMapping)
       if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
-      data = self.esClient.indices.create(self.analyzerIndex, self.analyzerSettings) 
+      data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
     except:
       error = sys.exc_info()
       print "Error occurred during initialization of analyzer index", error
@@ -75,6 +84,7 @@ class Annotator:
     for processorInstance in self.config["processor_instances"]:
       processorInstance.annotate(self.config)
     self.__deleteAnalyzerIndex()
+    self.__deleteOutputFiles()
 
   def __keyify(self, phrase):
     phrase = phrase.strip()
@@ -130,7 +140,7 @@ class Annotator:
             key = self.__keyify(phrase)
             if len(key) > 0:
               if key not in self.bagOfPhrases:
-                self.bagOfPhrases[key] = {"phrase": phrase, "document_id": document["_id"]}
+                self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
     
     for key in self.bagOfPhrases:
       data = self.bagOfPhrases[key]
@@ -139,3 +149,17 @@ class Annotator:
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
+
+  def __deleteOutputFiles(self):
+    if os.path.exists(self.dataDir + "/classifier.pickle"):
+      os.remove(self.dataDir + "/classifier.pickle")
+    if os.path.exists(self.dataDir + "/bad-phrases.csv"):
+      os.remove(self.dataDir + "/bad-phrases.csv")
+    if os.path.exists(self.dataDir + "/good-phrases.csv"):
+      os.remove(self.dataDir + "/good-phrases.csv")
+    if os.path.exists(self.dataDir + "/hold-out-set.csv"):
+      os.remove(self.dataDir + "/hold-out-set.csv")
+    if os.path.exists(self.dataDir + "/test-set.csv"):
+      os.remove(self.dataDir + "/test-set.csv")
+    if os.path.exists(self.dataDir + "/training-set.csv"):
+      os.remove(self.dataDir + "/training-set.csv")
