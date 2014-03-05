@@ -56,35 +56,39 @@ def annotate(config):
   corpusFields = config["corpus"]["textFields"]
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
-  count = esClient.count(index=corpusIndex, doc_type=corpusType, body={"query":{"match_all":{}}})
-  corpusSize = count["count"]
-  documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"query":{"match_all":{}}, "size":corpusSize}, fields=corpusFields)
+  processingPageSize = config["processingPageSize"]
+  nextDocumentIndex = 0
+  while True:
+    documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"from": nextDocumentIndex,"size": processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=corpusFields)
+    if len(documents["hits"]["hits"]) == 0: break
 
-  for document in documents["hits"]["hits"]:
-    content = ""
-    for field in corpusFields:
-      if type(document["fields"][field]) is list:
-        for element in document["fields"][field]:
-          content += element + "."
-      else:
-        content += document["fields"][field] + "."
-      
-    annotatedDocument = {}
-    sentences = nltk.sent_tokenize(content)
-    posTaggedSentences = []
-    for sentence in sentences:
-      sentence = sentence.strip()
-      if len(sentence) > 1:
-        sentence = sentence.replace("-", " ")
-        sentenceWords = nltk.word_tokenize(sentence.lower())
-        sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
-        posTags = nltk.pos_tag(sentenceWords)
-        posTaggedSentences.append(posTags)
-    if esClient.exists(index=processorIndex, doc_type=processorType, id=document["_id"]):
-      annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
-    annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
-    esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
-    print "pos-processor: Annotated document '" + document["_id"] + "'"
+    print "Annotating from " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents..."
+    for document in documents["hits"]["hits"]:
+      content = ""
+      for field in corpusFields:
+        if type(document["fields"][field]) is list:
+          for element in document["fields"][field]:
+            content += element + "."
+        else:
+          content += document["fields"][field] + "."
+        
+      annotatedDocument = {}
+      sentences = nltk.sent_tokenize(content)
+      posTaggedSentences = []
+      for sentence in sentences:
+        sentence = sentence.strip()
+        if len(sentence) > 1:
+          sentence = sentence.replace("-", " ")
+          sentenceWords = nltk.word_tokenize(sentence.lower())
+          sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
+          posTags = nltk.pos_tag(sentenceWords)
+          posTaggedSentences.append(posTags)
+      if esClient.exists(index=processorIndex, doc_type=processorType, id=document["_id"]):
+        annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
+      annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
+      esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
+      print "pos-processor: Annotated document '" + document["_id"] + "'"
+    nextDocumentIndex += len(documents["hits"]["hits"]) 
 
 def extractFeatures(config, phraseFeaturesDict):
 

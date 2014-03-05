@@ -25,6 +25,7 @@ class Annotator:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
+    self.processingPageSize = config["processingPageSize"]
     self.analyzerIndex = self.corpusIndex + "__analysis__"
     
     analyzerIndexSettings = {
@@ -67,7 +68,7 @@ class Annotator:
       if self.esClient.indices.exists(self.config["processor"]["index"]):
         self.esClient.indices.delete(self.config["processor"]["index"])
       self.esClient.indices.create(self.config["processor"]["index"])
-      self.esClient.indices.put_mapping(self.processorPhraseType,analyzerIndexTypeMapping)
+      self.esClient.indices.put_mapping(self.config["processor"]["index"],self.processorPhraseType,analyzerIndexTypeMapping)
       if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
       data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
@@ -118,33 +119,35 @@ class Annotator:
     return isValid
 
   def __indexPhrases(self):
-    count = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}})
-    self.corpusSize = count["count"]
-    self.documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}, "size":self.corpusSize}, fields=self.corpusFields)
-    for document in self.documents["hits"]["hits"]:
-      for field in self.corpusFields:
-        shingles = []
-        if type(document["fields"][field]) is list:
-          for element in document["fields"][field]:
-            if len(element) > 0:
-              shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
-              shingles += shingleTokens["tokens"]
-        else:
-          if len(document["fields"][field]) > 0:
-            shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
-        shingles = map(self.__replaceUnderscore, shingles)
-        shingles = filter(self.__filterTokens, shingles)
-        if shingles != None and len(shingles) > 0:
-          for shingle in shingles:
-            phrase = shingle["token"]
-            key = self.__keyify(phrase)
-            if len(key) > 0:
-              if key not in self.bagOfPhrases:
-                self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
-    
-    for key in self.bagOfPhrases:
-      data = self.bagOfPhrases[key]
-      self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
+    nextDocumentIndex = 0
+    while True:
+      documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=self.corpusFields)
+      if len(documents["hits"]["hits"]) == 0: break
+      print "Generating shingles from " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents..."
+      for document in documents["hits"]["hits"]:
+        for field in self.corpusFields:
+          shingles = []
+          if type(document["fields"][field]) is list:
+            for element in document["fields"][field]:
+              if len(element) > 0:
+                shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
+                shingles += shingleTokens["tokens"]
+          else:
+            if len(document["fields"][field]) > 0:
+              shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
+          shingles = map(self.__replaceUnderscore, shingles)
+          shingles = filter(self.__filterTokens, shingles)
+          if shingles != None and len(shingles) > 0:
+            for shingle in shingles:
+              phrase = shingle["token"]
+              key = self.__keyify(phrase)
+              if len(key) > 0:
+                if key not in self.bagOfPhrases:
+                  self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
+      for key in self.bagOfPhrases:
+        data = self.bagOfPhrases[key]
+        self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
+      nextDocumentIndex += len(documents["hits"]["hits"])
 
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):

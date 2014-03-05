@@ -25,7 +25,7 @@ class Generator:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"]+"__phrase"
-    self.processingPageSize = config["generator"]["processingPageSize"]
+    self.processingPageSize = config["processingPageSize"]
     config["processor_phrase_type"] = self.processorPhraseType
     self.analyzerIndex = self.corpusIndex + "__analysis__"
     self.analyzerSettings = {
