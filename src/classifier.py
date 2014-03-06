@@ -12,10 +12,11 @@ __name__ = "classifier"
 
 class Classifier:
 
-  def __init__(self, config, dataDir):
+  def __init__(self, config, dataDir, testFilePath):
     self.config = config
     self.dataDir = dataDir
     self.classifierFilePath = self.dataDir + "/classifier.pickle"
+    self.testFilePath = testFilePath
     self.trainD = None
     self.classifier = None
     self.features = self.config["generator"]["features"]
@@ -30,7 +31,7 @@ class Classifier:
       self.__train()
 
     self.trainD = self.__loadDataFromCSV(self.dataDir + "/training-set.csv", "train", None)
-    testD = self.__loadDataFromCSV(self.dataDir + "/test-set.csv", "test", self.trainD.domain)
+    testD = self.__loadDataFromCSV(self.testFilePath, "test", self.trainD.domain)
     
     self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
     testD = orange.ExampleTable(self.trainD.domain, testD)

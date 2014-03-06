@@ -18,7 +18,10 @@ if option == "-a":
 elif option == "-g":
   bayzee.generate(configFilePath)
 elif option == "-c":
-  bayzee.classify(configFilePath)
+  testFilePath = "test-set.csv"
+  if len(sys.argv) > 3 and sys.argv[3] != None:
+    testFilePath = os.path.abspath(sys.argv[3])
+  bayzee.classify(configFilePath, testFilePath)
 else:
   print "Invalid option passed, please see README for usage"
   sys.exit(1)

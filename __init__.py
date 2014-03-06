@@ -68,9 +68,12 @@ def generate(configFilePath):
   gen = generator.Generator(config, dataDir, trainingDataset, holdOutDataset)
   gen.generate()
 
-def classify(configFilePath):
+def classify(configFilePath, testFilePath):
   config = __loadConfig(configFilePath)
   dataDir = __getDataDir(configFilePath, config)
 
-  cls = classifier.Classifier(config, dataDir)
+  if testFilePath == None:
+    testFilePath = dataDir + "test-set.csv"
+
+  cls = classifier.Classifier(config, dataDir, testFilePath)
   cls.classify()
