@@ -68,7 +68,7 @@ class Annotator:
       if self.esClient.indices.exists(self.config["processor"]["index"]):
         self.esClient.indices.delete(self.config["processor"]["index"])
       self.esClient.indices.create(self.config["processor"]["index"])
-      self.esClient.indices.put_mapping(self.config["processor"]["index"],self.processorPhraseType,analyzerIndexTypeMapping)
+      self.esClient.indices.put_mapping(index=self.config["processor"]["index"],doc_type=self.processorPhraseType,body=analyzerIndexTypeMapping)
       if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
       data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
