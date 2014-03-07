@@ -51,76 +51,80 @@ Following is a high level description of how bayzee works:
   
   ```yaml
   # Elasticsearch server
-  elasticsearch: 
-    # host where Elasticsearch server is running
-    host: "127.0.0.1"
-    # port on which Elasticsearch server is listening
-    port: 9200
-  
-  # Corpus to use
-  corpus:
-    # name of the Elasticsearch index where the corpus is stored
-    index: "example_corpus"
-    # name of the Elasticsearch document type where the corpus is stored
-    type: "product"
-    # list of document fields to generate phrases from
-    textFields: ["name","description","category","manufacturer"]
-  
-  # Processors (add custom processors to list of modules)
-  processor:
-    # name of the Elasticsearch index where annotated text is stored by the processors
-    index: "example_corpus__annotated"
-    # name of the Elasticsearch document type where annotated text is stored by the processors
-    type: "product"
-    # list of processor modules
-    modules:
-        # standard bayzee processor to POS tag english text
-        # name of the prcessor
-      - name: "pos_processor"
-        # path to the python module (relative to the location of this config file)
-        path: "../lib/pos-processor.py"
-        # features that this processor extracts
-        features:
-          - name: "pos_tags"
-            is_numerical: False
-          - name: "first_pos_tag"
-            is_numerical: False
-          - name: "middle_pos_tag"
-            is_numerical: False
-          - name: "last_pos_tag"
-            is_numerical: False
-          - name: "avg_word_length"
-            is_numerical: True
-          - name: "non_alpha_chars"
-            is_numerical: True
-  
-  # Generation
-  generator:
-    # training set file path (relative to the location of this config file)
-    training_phrases_file_path: "training-phrases.csv"
-    # hold-out set file path (relative to the location of this config file)
-    hold_out_phrases_file_path: "hold-out-phrases.csv"
-    # maximum number of words in generated phrase
-    max_shingle_size: 3
-    # minimum number of words in generated phrase
-    min_shingle_size: 2
-    # list of features to extract
-    features:
-      - name: "doc_count"
-        is_numerical: True
-      - name: "max_term_frequency"
-        is_numerical: True
-      - name: "avg_term_frequency"
-        is_numerical: True
-      - name: "max_score"
-        is_numerical: True
-      - name: "avg_score"
-        is_numerical: True
-    # precision of numerical features
-    float_precision: 4
-  
-  # output directory (relative to the location of this config file)
-  output_path: "../data"
+  # Elasticsearch server
+elasticsearch: 
+  # host where Elasticsearch server is running
+  host: "127.0.0.1"
+  # port on which Elasticsearch server is listening
+  port: 9200
+
+# Corpus to use
+corpus:
+  # name of the Elasticsearch index where the corpus is stored
+  index: "example_corpus"
+  # name of the Elasticsearch document type where the corpus is stored
+  type: "product"
+  # list of document fields to generate phrases from
+  textFields: ["name","description","category","manufacturer"]
+
+# number of documents to process at a time
+processingPageSize: 1000  
+
+# Processors (add custom processors to list of modules)
+processor:
+  # name of the Elasticsearch index where annotated text is stored by the processors
+  index: "example_corpus__annotated"
+  # name of the Elasticsearch document type where annotated text is stored by the processors
+  type: "product"
+  # list of processor modules
+  modules:
+      # standard bayzee processor to POS tag english text
+      # name of the prcessor
+    - name: "pos_processor"
+      # path to the python module (relative to the location of this config file)
+      path: "../lib/pos-processor.py"
+      # features that this processor extracts
+      features:
+        - name: "pos_tags"
+          is_numerical: False
+        - name: "first_pos_tag"
+          is_numerical: False
+        - name: "middle_pos_tag"
+          is_numerical: False
+        - name: "last_pos_tag"
+          is_numerical: False
+        - name: "avg_word_length"
+          is_numerical: True
+        - name: "non_alpha_chars"
+          is_numerical: True
+
+# Generation
+generator:
+  # training set file path (relative to the location of this config file)
+  training_phrases_file_path: "training-phrases.csv"
+  # hold-out set file path (relative to the location of this config file)
+  hold_out_phrases_file_path: "hold-out-phrases.csv"
+  # maximum number of words in generated phrase
+  max_shingle_size: 3
+  # minimum number of words in generated phrase
+  min_shingle_size: 2
+  # list of features to extract
+  features:
+    - name: "doc_count"
+      is_numerical: True
+    - name: "max_term_frequency"
+      is_numerical: True
+    - name: "avg_term_frequency"
+      is_numerical: True
+    - name: "max_score"
+      is_numerical: True
+    - name: "avg_score"
+      is_numerical: True
+  # precision of numerical features
+  float_precision: 4  
+
+# output directory (relative to the location of this config file)
+output_path: "../data"
   ```
 
 ## Customization
