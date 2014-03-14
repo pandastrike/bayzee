@@ -73,11 +73,12 @@ def annotate(config):
     for document in documents["hits"]["hits"]:
       content = ""
       for field in corpusFields:
-        if type(document["fields"][field]) is list:
-          for element in document["fields"][field]:
-            content += element + "."
-        else:
-          content += document["fields"][field] + "."
+        if field in document["fields"]:
+          if type(document["fields"][field]) is list:
+            for element in document["fields"][field]:
+              content += element + "."
+          else:
+            content += document["fields"][field] + "."
         
       annotatedDocument = {}
       sentences = nltk.sent_tokenize(content)

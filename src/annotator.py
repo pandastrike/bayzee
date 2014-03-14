@@ -138,16 +138,17 @@ class Annotator:
       for document in documents["hits"]["hits"]:
         for field in self.corpusFields:
           shingles = []
-          if type(document["fields"][field]) is list:
-            for element in document["fields"][field]:
-              if len(element) > 0:
-                shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
-                shingles += shingleTokens["tokens"]
-          else:
-            if len(document["fields"][field]) > 0:
-              shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
-          shingles = map(self.__replaceUnderscore, shingles)
-          shingles = filter(self.__filterTokens, shingles)
+          if field in document["fields"]:
+            if type(document["fields"][field]) is list:
+              for element in document["fields"][field]:
+                if len(element) > 0:
+                  shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
+                  shingles += shingleTokens["tokens"]
+            else:
+              if len(document["fields"][field]) > 0:
+                shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
+            shingles = map(self.__replaceUnderscore, shingles)
+            shingles = filter(self.__filterTokens, shingles)
           if shingles != None and len(shingles) > 0:
             for shingle in shingles:
               phrase = shingle["token"]
