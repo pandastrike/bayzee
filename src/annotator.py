@@ -64,27 +64,31 @@ class Annotator:
     for module in config["processor"]["modules"]:
       self.featureNames = self.featureNames + map(lambda x: x["name"], module["features"])
 
-    try:
-      if self.esClient.indices.exists(self.config["processor"]["index"]):
-        self.esClient.indices.delete(self.config["processor"]["index"])
-      self.esClient.indices.create(self.config["processor"]["index"])
-      self.esClient.indices.put_mapping(index=self.config["processor"]["index"],doc_type=self.processorPhraseType,body=analyzerIndexTypeMapping)
-      if self.esClient.indices.exists(self.analyzerIndex):
-        self.esClient.indices.delete(self.analyzerIndex)
-      data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
-    except:
-      error = sys.exc_info()
-      print "Error occurred during initialization of analyzer index", error
-      sys.exit(1)
-    else:
-      sleep(1)
+    if self.esClient.indices.exists(self.analyzerIndex):
+      self.esClient.indices.delete(self.analyzerIndex)
+    data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
+        
+    if "annotateFromScratch" not in self.config or self.config["annotateFromScratch"] == True:
+      try:
+        if self.esClient.indices.exists(self.config["processor"]["index"]):
+          self.esClient.indices.delete(self.config["processor"]["index"])
+        self.esClient.indices.create(self.config["processor"]["index"])
+        self.esClient.indices.put_mapping(index=self.config["processor"]["index"],doc_type=self.processorPhraseType,body=analyzerIndexTypeMapping)
+        if self.esClient.indices.exists(self.analyzerIndex):
+          self.esClient.indices.delete(self.analyzerIndex)
+        data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
+      except:
+        error = sys.exc_info()
+        print "Error occurred during initialization of analyzer index", error
+        sys.exit(1)
+      else:
+        sleep(1)
 
   def annotate(self):
     print "Annotating documents and phrases..."
     self.__indexPhrases()
     for processorInstance in self.config["processor_instances"]:
       processorInstance.annotate(self.config)
-    self.__deleteAnalyzerIndex()
     self.__deleteOutputFiles()
 
   def __keyify(self, phrase):
@@ -119,7 +123,14 @@ class Annotator:
     return isValid
 
   def __indexPhrases(self):
-    nextDocumentIndex = 0
+    if "processingStartIndex" in self.config: 
+      nextDocumentIndex = self.config["processingStartIndex"]
+    else:
+      nextDocumentIndex = 0
+    if "processingEndIndex" in self.config:
+      endDocumentIndex = self.config["processingEndIndex"]
+    else:
+      endDocumentIndex = -1
     while True:
       documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=self.corpusFields)
       if len(documents["hits"]["hits"]) == 0: break
@@ -148,6 +159,7 @@ class Annotator:
         data = self.bagOfPhrases[key]
         self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
       nextDocumentIndex += len(documents["hits"]["hits"])
+      if endDocumentIndex != -1 and endDocumentIndex <= nextDocumentIndex: break
 
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):

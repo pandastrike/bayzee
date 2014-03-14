@@ -57,7 +57,14 @@ def annotate(config):
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
   processingPageSize = config["processingPageSize"]
-  nextDocumentIndex = 0
+  if "processingStartIndex" in config: 
+    nextDocumentIndex = config["processingStartIndex"]
+  else:
+    nextDocumentIndex = 0
+  if "processingEndIndex" in config:
+    endDocumentIndex = config["processingEndIndex"]
+  else:
+    endDocumentIndex = -1
   while True:
     documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"from": nextDocumentIndex,"size": processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=corpusFields)
     if len(documents["hits"]["hits"]) == 0: break
@@ -88,7 +95,8 @@ def annotate(config):
       annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
       esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
       print "pos-processor: Annotated document '" + document["_id"] + "'"
-    nextDocumentIndex += len(documents["hits"]["hits"]) 
+    nextDocumentIndex += len(documents["hits"]["hits"])
+    if endDocumentIndex != -1 and endDocumentIndex <= nextDocumentIndex: break
 
 def extractFeatures(config, phraseFeaturesDict):
 
