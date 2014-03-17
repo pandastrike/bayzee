@@ -65,6 +65,8 @@ def annotate(config):
     endDocumentIndex = config["processingEndIndex"]
   else:
     endDocumentIndex = -1
+  if nextDocumentIndex == endDocumentIndex: return
+  
   while True:
     documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"from": nextDocumentIndex,"size": processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=corpusFields)
     if len(documents["hits"]["hits"]) == 0: break
