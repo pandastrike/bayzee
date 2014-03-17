@@ -131,6 +131,8 @@ class Annotator:
       endDocumentIndex = self.config["processingEndIndex"]
     else:
       endDocumentIndex = -1
+    if nextDocumentIndex == endDocumentIndex: return
+    
     while True:
       documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=self.corpusFields)
       if len(documents["hits"]["hits"]) == 0: break
