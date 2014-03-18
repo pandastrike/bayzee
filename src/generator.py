@@ -1,22 +1,22 @@
 import csv
-import sys
 import os
 import os.path
 import json
 import re
 from elasticsearch import Elasticsearch
-from time import sleep
 
 __name__ = "generator"
 
 class Generator:
   
-  def __init__(self, config, dataDir, trainingDataset, holdOutDataset):
+  def __init__(self, config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex, processingPageSize):
     self.config = config
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.dataDir = dataDir
     self.trainingDataset = trainingDataset
     self.holdOutDataset = holdOutDataset
+    self.config["processingStartIndex"] = processingStartIndex
+    self.config["processingEndIndex"] = processingEndIndex
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
@@ -25,7 +25,7 @@ class Generator:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"]+"__phrase"
-    self.processingPageSize = config["processingPageSize"]
+    self.processingPageSize = processingPageSize
     config["processor_phrase_type"] = self.processorPhraseType
     self.analyzerIndex = self.corpusIndex + "__analysis__"
     self.analyzerSettings = {
@@ -64,6 +64,9 @@ class Generator:
     processorIndex = self.config["processor"]["index"]
     phraseProcessorType = self.config["processor"]["type"]+"__phrase"
     nextPhraseIndex = 0
+    if self.config["processingStartIndex"] != None: nextPhraseIndex = int(self.config["processingStartIndex"])
+    endPhraseIndex = -1
+    if self.config["processingEndIndex"] != None: endPhraseIndex = int(self.config["processingEndIndex"])
     if not os.path.exists(self.dataDir + "/test-set.csv"):
       self.__createFiles()
       nextPhraseIndex = 0
@@ -132,8 +135,9 @@ class Generator:
         processorInstance.extractFeatures(self.config, self.bagOfPhrases)
       
       self.__writeToFile()
-      self.bagOfPhrases = {}
+      self.bagOfPhrases = {}      
       nextPhraseIndex += len(phrases["hits"]["hits"])
+      if endPhraseIndex != -1 and nextPhraseIndex > endPhraseIndex: break
         
   def __writeToFile(self):
     #output files

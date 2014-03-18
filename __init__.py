@@ -37,14 +37,14 @@ def __getDataDir(configFilePath, config):
     os.makedirs(dataDir)
   return dataDir
 
-def annotate(configFilePath):
+def annotate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
   dataDir = __getDataDir(configFilePath, config)
-  ann = annotator.Annotator(config, dataDir)
+  ann = annotator.Annotator(config, dataDir, int(processingStartIndex), int(processingEndIndex), int(processingPageSize))
   ann.annotate()
 
-def generate(configFilePath):
+def generate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
 
@@ -65,7 +65,7 @@ def generate(configFilePath):
     values = row.split(",")
     holdOutDataset[values[0]] = values[1]
 
-  gen = generator.Generator(config, dataDir, trainingDataset, holdOutDataset)
+  gen = generator.Generator(config, dataDir, trainingDataset, holdOutDataset, int(processingStartIndex), int(processingEndIndex), int(processingPageSize))
   gen.generate()
 
 def classify(configFilePath, testFilePath):
