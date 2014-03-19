@@ -63,6 +63,8 @@ class Generator:
   def __extractFeatures(self):
     processorIndex = self.config["processor"]["index"]
     phraseProcessorType = self.config["processor"]["type"]+"__phrase"
+    count = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}})
+    self.corpusSize = count["count"]
     nextPhraseIndex = 0
     if self.config["processingStartIndex"] != None: nextPhraseIndex = self.config["processingStartIndex"]
     endPhraseIndex = -1
