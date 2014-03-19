@@ -1,10 +1,5 @@
-import csv
 import re
 import nltk
-import math
-import sys
-import os.path
-import imp
 from nltk.corpus import conll2000
 from elasticsearch import Elasticsearch
 
@@ -50,6 +45,7 @@ train_sents = conll2000.chunked_sents('train.txt')
 chunker = UnigramChunker(train_sents)
 
 def annotate(config):
+  if "getPosTags" in config and config["getPosTags"] == False: return
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
   corpusIndex = config["corpus"]["index"]
   corpusType = config["corpus"]["type"]
@@ -57,16 +53,10 @@ def annotate(config):
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
   processingPageSize = config["processingPageSize"]
-  if "processingStartIndex" in config: 
-    nextDocumentIndex = config["processingStartIndex"]
-  else:
-    nextDocumentIndex = 0
-  if "processingEndIndex" in config:
-    endDocumentIndex = config["processingEndIndex"]
-  else:
-    endDocumentIndex = -1
-  if nextDocumentIndex == endDocumentIndex: return
-  
+  nextDocumentIndex = 0
+  if config["processingStartIndex"] != None: nextDocumentIndex = int(config["processingStartIndex"])
+  endDocumentIndex = -1
+  if config["processingEndIndex"] != None: endDocumentIndex = int(config["processingEndIndex"])
   while True:
     documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"from": nextDocumentIndex,"size": processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=corpusFields)
     if len(documents["hits"]["hits"]) == 0: break

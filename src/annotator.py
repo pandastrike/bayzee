@@ -1,8 +1,6 @@
 import sys
 import os
 import os.path
-import yaml
-import json
 import re
 from elasticsearch import Elasticsearch
 from time import sleep
@@ -123,15 +121,11 @@ class Annotator:
     return isValid
 
   def __indexPhrases(self):
-    if "processingStartIndex" in self.config: 
-      nextDocumentIndex = self.config["processingStartIndex"]
-    else:
-      nextDocumentIndex = 0
-    if "processingEndIndex" in self.config:
-      endDocumentIndex = self.config["processingEndIndex"]
-    else:
-      endDocumentIndex = -1
-    if nextDocumentIndex == endDocumentIndex: return
+    if "indexPhrases" in self.config and self.config["indexPhrases"] == False: return
+    nextDocumentIndex = 0
+    if self.config["processingStartIndex"] != None: nextDocumentIndex = int(self.config["processingStartIndex"])
+    endDocumentIndex = -1
+    if self.config["processingEndIndex"] != None: endDocumentIndex = int(self.config["processingEndIndex"])
     
     while True:
       documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=self.corpusFields)
