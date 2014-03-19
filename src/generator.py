@@ -64,9 +64,9 @@ class Generator:
     processorIndex = self.config["processor"]["index"]
     phraseProcessorType = self.config["processor"]["type"]+"__phrase"
     nextPhraseIndex = 0
-    if self.config["processingStartIndex"] != None: nextPhraseIndex = int(self.config["processingStartIndex"])
+    if self.config["processingStartIndex"] != None: nextPhraseIndex = self.config["processingStartIndex"]
     endPhraseIndex = -1
-    if self.config["processingEndIndex"] != None: endPhraseIndex = int(self.config["processingEndIndex"])
+    if self.config["processingEndIndex"] != None: endPhraseIndex = self.config["processingEndIndex"]
     if not os.path.exists(self.dataDir + "/test-set.csv"):
       self.__createFiles()
       nextPhraseIndex = 0

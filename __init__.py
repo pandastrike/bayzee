@@ -3,9 +3,6 @@ import yaml
 import os
 import imp
 from src import classifier,generator,annotator
-from elasticsearch import Elasticsearch
-import csv
-import httplib
 
 __name__ = "bayzee"
 
@@ -41,7 +38,7 @@ def annotate(configFilePath, processingStartIndex, processingEndIndex, processin
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
   dataDir = __getDataDir(configFilePath, config)
-  ann = annotator.Annotator(config, dataDir, int(processingStartIndex), int(processingEndIndex), int(processingPageSize))
+  ann = annotator.Annotator(config, dataDir, processingStartIndex, processingEndIndex, processingPageSize)
   ann.annotate()
 
 def generate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
@@ -65,7 +62,7 @@ def generate(configFilePath, processingStartIndex, processingEndIndex, processin
     values = row.split(",")
     holdOutDataset[values[0]] = values[1]
 
-  gen = generator.Generator(config, dataDir, trainingDataset, holdOutDataset, int(processingStartIndex), int(processingEndIndex), int(processingPageSize))
+  gen = generator.Generator(config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex, processingPageSize)
   gen.generate()
 
 def classify(configFilePath, testFilePath):

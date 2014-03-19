@@ -15,19 +15,20 @@ configFilePath = os.path.abspath(sys.argv[2])
 if option == "-a":
   processingStartIndex = None
   processingEndIndex = None
-  processingPageSize = None
+  processingPageSize = 1000
   if len(sys.argv) > 5 and sys.argv[3] != None and sys.argv[4] != None and sys.argv[5] != None:
-    processingStartIndex = sys.argv[3]
-    processingEndIndex = sys.argv[4]
-    processingPageSize = sys.argv[5]
+    processingStartIndex = int(sys.argv[3])
+    processingEndIndex = int(sys.argv[4])
+    processingPageSize = int(sys.argv[5])
   bayzee.annotate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize)
 elif option == "-g":
   processingStartIndex = None
   processingEndIndex = None
+  processingPageSize = 1000
   if len(sys.argv) > 5 and sys.argv[3] != None and sys.argv[4] != None and sys.argv[5] != None:
-    processingStartIndex = sys.argv[3]
-    processingEndIndex = sys.argv[4]
-    processingPageSize = sys.argv[5]
+    processingStartIndex = int(sys.argv[3])
+    processingEndIndex = int(sys.argv[4])
+    processingPageSize = int(sys.argv[5])
   bayzee.generate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize)
 elif option == "-c":
   testFilePath = "test-set.csv"

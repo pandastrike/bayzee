@@ -54,9 +54,9 @@ def annotate(config):
   processorType = config["processor"]["type"]
   processingPageSize = config["processingPageSize"]
   nextDocumentIndex = 0
-  if config["processingStartIndex"] != None: nextDocumentIndex = int(config["processingStartIndex"])
+  if config["processingStartIndex"] != None: nextDocumentIndex = config["processingStartIndex"]
   endDocumentIndex = -1
-  if config["processingEndIndex"] != None: endDocumentIndex = int(config["processingEndIndex"])
+  if config["processingEndIndex"] != None: endDocumentIndex = config["processingEndIndex"]
   while True:
     documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"from": nextDocumentIndex,"size": processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=corpusFields)
     if len(documents["hits"]["hits"]) == 0: break

@@ -11,7 +11,7 @@ __name__ = "annotator"
 
 class Annotator:
   
-  def __init__(self, config, dataDir):
+  def __init__(self, config, dataDir, processingStartIndex, processingEndIndex, processingPageSize):
     self.config = config
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.dataDir = dataDir
@@ -23,8 +23,11 @@ class Annotator:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
-    self.processingPageSize = config["processingPageSize"]
+    self.processingPageSize = processingPageSize
     self.analyzerIndex = self.corpusIndex + "__analysis__"
+    self.config["processingStartIndex"] = processingStartIndex
+    self.config["processingEndIndex"] = processingEndIndex
+    self.config["processingPageSize"] = processingPageSize
     
     analyzerIndexSettings = {
       "index":{
@@ -123,9 +126,9 @@ class Annotator:
   def __indexPhrases(self):
     if "indexPhrases" in self.config and self.config["indexPhrases"] == False: return
     nextDocumentIndex = 0
-    if self.config["processingStartIndex"] != None: nextDocumentIndex = int(self.config["processingStartIndex"])
+    if self.config["processingStartIndex"] != None: nextDocumentIndex = self.config["processingStartIndex"]
     endDocumentIndex = -1
-    if self.config["processingEndIndex"] != None: endDocumentIndex = int(self.config["processingEndIndex"])
+    if self.config["processingEndIndex"] != None: endDocumentIndex = self.config["processingEndIndex"]
     
     while True:
       documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=self.corpusFields)
