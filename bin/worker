@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+import sys
+import os
+import imp
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+bayzee = imp.load_source("bayzee", os.path.abspath(os.path.join(os.path.dirname(__file__), "../__init__.py")))
+if len(sys.argv) != 3: 
+  print "Invalid number of arguments passed, please see README for usage"
+  sys.exit(1)
+
+option = sys.argv[1]
+configFilePath = os.path.abspath(sys.argv[2])
+
+if option == "-a":
+  bayzee.annotate(configFilePath)
+elif option == "-g":
+  bayzee.generate(configFilePath)
+elif option == "-c":
+  bayzee.classify(configFilePath)
+else:
+  print "Invalid option passed, please see README for usage"
+  sys.exit(1)

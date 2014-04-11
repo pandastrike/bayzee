@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+import sys
+import os
+import imp
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+bayzee = imp.load_source("bayzee", os.path.abspath(os.path.join(os.path.dirname(__file__), "../__init__.py")))
+if len(sys.argv) != 3 and len(sys.argv) != 4 and len(sys.argv) != 6:
+  print "Invalid number of arguments passed, please see README for usage"
+  sys.exit(1)
+
+option = sys.argv[1]
+configFilePath = os.path.abspath(sys.argv[2])
+
+if option == "-a":
+  processingStartIndex = None
+  processingEndIndex = None
+  processingPageSize = 1000
+  if len(sys.argv) > 5 and sys.argv[3] != None and sys.argv[4] != None and sys.argv[5] != None:
+    processingStartIndex = int(sys.argv[3])
+    processingEndIndex = int(sys.argv[4])
+    processingPageSize = int(sys.argv[5])
+  bayzee.dispatchToAnnotate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize)
+elif option == "-g":
+  processingStartIndex = None
+  processingEndIndex = None
+  processingPageSize = 1000
+  if len(sys.argv) > 5 and sys.argv[3] != None and sys.argv[4] != None and sys.argv[5] != None:
+    processingStartIndex = int(sys.argv[3])
+    processingEndIndex = int(sys.argv[4])
+    processingPageSize = int(sys.argv[5])
+  bayzee.dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize)
+elif option == "-c":
+  processingStartIndex = None
+  processingEndIndex = None
+  processingPageSize = 1000
+  if len(sys.argv) > 5 and sys.argv[3] != None and sys.argv[4] != None and sys.argv[5] != None:
+    processingStartIndex = int(sys.argv[3])
+    processingEndIndex = int(sys.argv[4])
+    processingPageSize = int(sys.argv[5])
+  bayzee.dispatchToClassify(configFilePath, processingStartIndex, processingEndIndex, processingPageSize)
+else:
+  print "Invalid option passed, please see README for usage"
+  sys.exit(1)

@@ -44,7 +44,7 @@ class UnigramChunker(nltk.ChunkParserI):
 train_sents = conll2000.chunked_sents('train.txt')
 chunker = UnigramChunker(train_sents)
 
-def annotate(config):
+def annotate(config, documentId):
   if "getPosTags" in config and config["getPosTags"] == False: return
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
   corpusIndex = config["corpus"]["index"]
@@ -52,44 +52,32 @@ def annotate(config):
   corpusFields = config["corpus"]["textFields"]
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
-  processingPageSize = config["processingPageSize"]
-  nextDocumentIndex = 0
-  if config["processingStartIndex"] != None: nextDocumentIndex = config["processingStartIndex"]
-  endDocumentIndex = -1
-  if config["processingEndIndex"] != None: endDocumentIndex = config["processingEndIndex"]
-  while True:
-    documents = esClient.search(index=corpusIndex, doc_type=corpusType, body={"from": nextDocumentIndex,"size": processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=corpusFields)
-    if len(documents["hits"]["hits"]) == 0: break
-
-    print "Annotating from " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents..."
-    for document in documents["hits"]["hits"]:
-      content = ""
-      for field in corpusFields:
-        if field in document["fields"]:
-          if type(document["fields"][field]) is list:
-            for element in document["fields"][field]:
-              content += element + ". "
-          else:
-            content += document["fields"][field] + ". "
-        
-      annotatedDocument = {}
-      sentences = nltk.sent_tokenize(content)
-      posTaggedSentences = []
-      for sentence in sentences:
-        sentence = sentence.strip()
-        if len(sentence) > 1:
-          sentence = sentence.replace("-", " ")
-          sentenceWords = nltk.word_tokenize(sentence.lower())
-          sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
-          posTags = nltk.pos_tag(sentenceWords)
-          posTaggedSentences.append(posTags)
-      if esClient.exists(index=processorIndex, doc_type=processorType, id=document["_id"]):
-        annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
-      annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
-      esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
-      print "pos-processor: Annotated document '" + document["_id"] + "'"
-    nextDocumentIndex += len(documents["hits"]["hits"])
-    if endDocumentIndex != -1 and endDocumentIndex <= nextDocumentIndex: break
+  document = esClient.get(index=corpusIndex, doc_type=corpusType, id = documentId, fields=corpusFields)
+  content = ""
+  for field in corpusFields:
+    if field in document["fields"]:
+      if type(document["fields"][field]) is list:
+        for element in document["fields"][field]:
+          content += element + ". "
+      else:
+        content += document["fields"][field] + ". "
+    
+  annotatedDocument = {}
+  sentences = nltk.sent_tokenize(content)
+  posTaggedSentences = []
+  for sentence in sentences:
+    sentence = sentence.strip()
+    if len(sentence) > 1:
+      sentence = sentence.replace("-", " ")
+      sentenceWords = nltk.word_tokenize(sentence.lower())
+      sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
+      posTags = nltk.pos_tag(sentenceWords)
+      posTaggedSentences.append(posTags)
+  if esClient.exists(index=processorIndex, doc_type=processorType, id=document["_id"]):
+    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
+  annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
+  esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
+  print "pos-processor: Annotated document '" + document["_id"] + "'"
 
 def extractFeatures(config, phraseFeaturesDict):
 
