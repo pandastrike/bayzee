@@ -4,6 +4,8 @@ import os.path
 import re
 from elasticsearch import Elasticsearch
 from time import sleep
+from lib.muppet.durable_channel import DurableChannel
+from lib.muppet.remote_channel import RemoteChannel
 
 esStopWords = ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"]
 
@@ -11,10 +13,9 @@ __name__ = "annotation_dispatcher"
 
 class AnnotationDispatcher:
   
-  def __init__(self, config, dataDir, processingStartIndex, processingEndIndex, processingPageSize):
+  def __init__(self, config, processingStartIndex, processingEndIndex, processingPageSize):
     self.config = config
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
-    self.dataDir = dataDir
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
@@ -28,6 +29,16 @@ class AnnotationDispatcher:
     self.config["processingStartIndex"] = processingStartIndex
     self.config["processingEndIndex"] = processingEndIndex
     self.config["processingPageSize"] = processingPageSize
+    self.totalDocumentsDispatched = 0
+    self.documentsAnnotated = 0
+    self.documentsNotAnnotated = 0
+    self.lastDispatcher = False
+    self.endProcess = False
+    self.dispatcherName = "bayzee.annotation.dispatcher"
+    self.workerName = "bayzee.annotation.worker"
+    self.timeout = 6000
+    if processingEndIndex != None:
+      self.dispatcherName += "." + str(processingStartIndex) + "." + str(processingEndIndex)
     analyzerIndexSettings = {
       "index":{
         "analysis":{
@@ -59,7 +70,8 @@ class AnnotationDispatcher:
         "phrase__not_analyzed":{"type":"string","index":"not_analyzed"}
       }
     }
-
+    corpusSize = self.esClient.count(index=self.corpusIndex, doc_type=self.corpusType, body={"query":{"match_all":{}}})
+    self.corpusSize = corpusSize["count"]
     self.featureNames = map(lambda x: x["name"], config["generator"]["features"])
     for module in config["processor"]["modules"]:
       self.featureNames = self.featureNames + map(lambda x: x["name"], module["features"])
@@ -68,7 +80,6 @@ class AnnotationDispatcher:
       if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
       data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
-      self.__deleteOutputFiles
         
     if "annotateFromScratch" not in self.config or self.config["annotateFromScratch"] == True:
       try:
@@ -86,52 +97,71 @@ class AnnotationDispatcher:
       else:
         sleep(1)
 
-  def dispatcher(self, dispatcher):
+    #dispatcher creation
+    self.annotationDispatcher = DurableChannel(self.dispatcherName, config, self.timeoutCallback)
+
+    #remote channel intialisation
+    self.controlChannel = RemoteChannel(self.dispatcherName, config)
+
+  def dispatchToAnnotate(self):
     if "indexPhrases" in self.config and self.config["indexPhrases"] == False: return
     nextDocumentIndex = 0
     if self.config["processingStartIndex"] != None: nextDocumentIndex = self.config["processingStartIndex"]
     endDocumentIndex = -1
     if self.config["processingEndIndex"] != None: endDocumentIndex = self.config["processingEndIndex"]
-    docLength = 0
+    self.totalDocumentsDispatched = 0
     while True:
       documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=["_id"])
       if len(documents["hits"]["hits"]) == 0: 
         break
-      docLength += len(documents["hits"]["hits"])
+      self.totalDocumentsDispatched += len(documents["hits"]["hits"])
       print "dispatching " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents..."
       for document in documents["hits"]["hits"]:
         print "dispatcher sending message for document ", document["_id"]
-        content = {"_id": document["_id"], "type": "annotate"}
-        to = self.config["redis"]["worker_name"]
-        timeout = 60000000
-        dispatcher.send(content, to, timeout)
-      
+        content = {"_id": document["_id"], "type": "annotate", "count": 1, "from":self.dispatcherName}
+        self.annotationDispatcher.send(content, self.workerName)
       nextDocumentIndex += len(documents["hits"]["hits"])
       if endDocumentIndex != -1 and endDocumentIndex <= nextDocumentIndex: 
         break
-    print docLength, " total dispatched"
-    i = 0
+    
     while True:
-      message = dispatcher.receive()
-      print message["content"]["documentId"], i
-      i += 1
-    # dispatcher.close()
-    # print "dispatcher closed"
+      message = self.annotationDispatcher.receive()
+      if "documentId" in message["content"] and message["content"]["documentId"] > 0:
+        self.documentsAnnotated += 1
+        self.annotationDispatcher.close(message)
+        print message["content"]["documentId"], self.documentsAnnotated
+      
+      if (self.documentsAnnotated + self.documentsNotAnnotated) >= self.totalDocumentsDispatched and not self.lastDispatcher:
+        self.controlChannel.send("dying")
+        content = {"type": "stop_dispatcher", "dispatcherId": self.dispatcherName}
+        self.annotationDispatcher.send(content, self.workerName, self.timeout * self.timeout) # to be sert to a large value
+
+      if message["content"]["type"] == "stop_dispatcher":
+        self.annotationDispatcher.close(message)
+        break
+    
+    self.__terminate()
+
+  def timeoutCallback(self, message):
+    
+    if message["content"]["count"] < 5:
+      message["content"]["count"] += 1
+      self.annotationDispatcher.send(message["content"], self.workerName, self.timeout)
+    else:
+      #log implementation yet to be done for expired documents
+      self.documentsNotAnnotated += 1
+      if self.documentsNotAnnotated == self.totalDocumentsDispatched or (self.documentsAnnotated + self.documentsNotAnnotated) == self.totalDocumentsDispatched:
+        self.__terminate()
+
+  def __terminate(self):
+    print self.totalDocumentsDispatched, " total dispatched"
+    print self.documentsAnnotated, " total received"
+    print self.documentsNotAnnotated, " not annotated"
+    print "process completed"
+    # sys.exit(0)
+
 
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
 
-  def __deleteOutputFiles(self):
-    if os.path.exists(self.dataDir + "/classifier.pickle"):
-      os.remove(self.dataDir + "/classifier.pickle")
-    if os.path.exists(self.dataDir + "/bad-phrases.csv"):
-      os.remove(self.dataDir + "/bad-phrases.csv")
-    if os.path.exists(self.dataDir + "/good-phrases.csv"):
-      os.remove(self.dataDir + "/good-phrases.csv")
-    if os.path.exists(self.dataDir + "/hold-out-set.csv"):
-      os.remove(self.dataDir + "/hold-out-set.csv")
-    if os.path.exists(self.dataDir + "/test-set.csv"):
-      os.remove(self.dataDir + "/test-set.csv")
-    if os.path.exists(self.dataDir + "/training-set.csv"):
-      os.remove(self.dataDir + "/training-set.csv")

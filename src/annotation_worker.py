@@ -4,6 +4,8 @@ import os.path
 import re
 from elasticsearch import Elasticsearch
 from time import sleep
+from lib.muppet.durable_channel import DurableChannel
+from lib.muppet.remote_channel import RemoteChannel
 
 esStopWords = ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"]
 
@@ -19,45 +21,67 @@ class AnnotationWorker:
     self.corpusType = config["corpus"]["type"]
     self.corpusFields = config["corpus"]["textFields"]
     self.corpusSize = 0
+    self.workerName = "bayzee.annotation.worker"
+    self.timeout = 6000000000
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
     self.analyzerIndex = self.corpusIndex + "__analysis__"
-    
-    
+    self.worker = DurableChannel(self.workerName, config)
+    self.dispatchers = {}
   
-  def annotate(self, worker):
+  def annotate(self):
     while True:
-      message = worker.receive()
-      documentId = message["content"]["_id"]
-      document = self.esClient.get(index=self.corpusIndex, doc_type=self.corpusType, id = documentId, fields=self.corpusFields)
-      for field in self.corpusFields:
-        shingles = []
-        if field in document["fields"]:
-          if type(document["fields"][field]) is list:
-            for element in document["fields"][field]:
-              if len(element) > 0:
-                shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
-                shingles += shingleTokens["tokens"]
-          else:
-            if len(document["fields"][field]) > 0:
-              shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
-          shingles = map(self.__replaceUnderscore, shingles)
-          shingles = filter(self.__filterTokens, shingles)
-        if shingles != None and len(shingles) > 0:
-          for shingle in shingles:
-            phrase = shingle["token"]
-            key = self.__keyify(phrase)
-            if len(key) > 0:
-              if key not in self.bagOfPhrases:
-                self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
-      for key in self.bagOfPhrases:
-        data = self.bagOfPhrases[key]
-        if not self.esClient.exists(index=self.processorIndex, doc_type=self.processorPhraseType, id=key):
-          self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
-      for processorInstance in self.config["processor_instances"]:
-        processorInstance.annotate(self.config, documentId)
-      worker.reply(message, {"documentId": documentId, "status" : "processed", "type" : "reply"}, 120000000)
+      message = self.worker.receive()
+      if message["content"]["type"] == "annotate":
+        if message["content"]["from"] not in self.dispatchers:
+          self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
+          self.dispatchers[message["content"]["from"]].listen(lambda m: self.unregisterDispatcher(message["content"]["from"], m))
+        documentId = message["content"]["_id"]
+        document = self.esClient.get(index=self.corpusIndex, doc_type=self.corpusType, id = documentId, fields=self.corpusFields)
+        for field in self.corpusFields:
+          shingles = []
+          if field in document["fields"]:
+            if type(document["fields"][field]) is list:
+              for element in document["fields"][field]:
+                if len(element) > 0:
+                  shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
+                  shingles += shingleTokens["tokens"]
+            else:
+              if len(document["fields"][field]) > 0:
+                shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
+            shingles = map(self.__replaceUnderscore, shingles)
+            shingles = filter(self.__filterTokens, shingles)
+          if shingles != None and len(shingles) > 0:
+            for shingle in shingles:
+              phrase = shingle["token"]
+              key = self.__keyify(phrase)
+              if len(key) > 0:
+                if key not in self.bagOfPhrases:
+                  self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
+        for key in self.bagOfPhrases:
+          data = self.bagOfPhrases[key]
+          if not self.esClient.exists(index=self.processorIndex, doc_type=self.processorPhraseType, id=key):
+            self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
+        for processorInstance in self.config["processor_instances"]:
+          processorInstance.annotate(self.config, documentId)
+        self.worker.reply(message, {"documentId": documentId, "status" : "processed", "type" : "reply"}, self.timeout)
+      if message["content"]["type"] == "stop_dispatcher":
+        self.worker.reply(message, {"documentId": -1, "status" : "stop_dispatcher", "type" : "stop_dispatcher"}, self.timeout)        
+      if len(self.dispatchers) == 0:
+        print "worker exiting no more dispatchers found"
+        break
+    self.worker.end()
+    print "worker closed"
+
+  def unregisterDispatcher(self, dispatcher, message):
+    if message == "dying":
+      self.dispatchers.pop(dispatcher, None)
+
+    if len(self.dispatchers) == 0:
+      print len(self.dispatchers)
+      self.worker.end()
+      sys.exit(0)
 
   def __keyify(self, phrase):
     phrase = phrase.strip()

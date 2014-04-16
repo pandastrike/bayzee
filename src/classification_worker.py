@@ -7,6 +7,8 @@ import pickle
 import nltk
 import time
 from elasticsearch import Elasticsearch
+from lib.muppet.durable_channel import DurableChannel
+from lib.muppet.remote_channel import RemoteChannel
 
 __name__ = "classification_worker"
 
@@ -26,37 +28,54 @@ class ClassificationWorker:
     for module in self.config["processor"]["modules"]:
       self.features = self.features + module["features"]
 
-  def classify(self, worker):
-    while True:
-      message = worker.receive()
-      self.phraseId = message["content"]["phraseId"]
-      print "classifying phrase ", self.phraseId 
-      if self.classifier == None:
-        self.trainD = self.__loadDataFromES("train", None)
-        self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
-        self.__train()
-
-      self.trainD = self.__loadDataFromES("train", None)
-      testD = self.__loadDataFromES("test", self.trainD.domain)
+    self.workerName = "bayzee.classification.worker"
+    self.timeout = 600000
+    self.dispatchers = {}
     
-      self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
-      testD = orange.ExampleTable(self.trainD.domain, testD)
+    #creating worker
+    self.worker = DurableChannel(self.workerName, config)
 
-      print("Classifying " + str(len(testD)) + " phrases with Naive Bayes Classifier...")
+  def classify(self):
+    while True:
+      message = self.worker.receive()
+      if message["content"]["type"] == "classify":
+        if message["content"]["from"] not in self.dispatchers:
+          self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
+          self.dispatchers[message["content"]["from"]].listen(lambda m: self.unregisterDispatcher(message["content"]["from"], m))
+        self.phraseId = message["content"]["phraseId"]
+        print "classifying phrase ", self.phraseId 
+        if self.classifier == None:
+          self.trainD = self.__loadDataFromES("train", None)
+          self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
+          self.__train()
 
-      for row in testD:
-        phrase = row.getmetas().values()[0].value
-        featureSet = {}
-        for i,feature in enumerate(self.features):
-          featureSet[feature["name"]] = row[i].value
+        self.trainD = self.__loadDataFromES("train", None)
+        testD = self.__loadDataFromES("test", self.trainD.domain)
+      
+        self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
+        testD = orange.ExampleTable(self.trainD.domain, testD)
 
-        prob = self.classifier.prob_classify(featureSet).prob("1")
-        classType = self.classifier.classify(featureSet)
-        self.phraseData["_source"]["prob"] = prob
-        self.phraseData["_source"]["class_type"] = classType
-        print prob, classType
-        self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=self.phraseId, body=self.phraseData["_source"])
-      worker.reply(message, {"phraseId": self.phraseId, "status" : "classified", "type" : "reply"}, 120000000)   
+        print("Classifying " + str(len(testD)) + " phrases with Naive Bayes Classifier...")
+
+        for row in testD:
+          phrase = row.getmetas().values()[0].value
+          featureSet = {}
+          for i,feature in enumerate(self.features):
+            featureSet[feature["name"]] = row[i].value
+
+          prob = self.classifier.prob_classify(featureSet).prob("1")
+          classType = self.classifier.classify(featureSet)
+          self.phraseData["_source"]["prob"] = prob
+          self.phraseData["_source"]["class_type"] = classType
+          print prob, classType
+          self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=self.phraseId, body=self.phraseData["_source"])
+          self.worker.reply(message, {"phraseId": self.phraseId, "status" : "classified", "type" : "reply"}, 120000000)   
+      if message["content"]["type"] == "stop_dispatcher":
+        self.worker.reply(message, {"phraseId": -1, "status" : "stop_dispatcher", "type" : "stop_dispatcher"}, self.timeout)        
+      if len(self.dispatchers) == 0:
+        print "worker exiting no more dispatchers found"
+        break
+    self.worker.end()
     # self.__calculateMeasures()
 
   def __getOrangeVariableForFeature(self, feature):
@@ -78,7 +97,6 @@ class ClassificationWorker:
     phrases = []
     if dataType == "train":
       phrasesCount = self.esClient.count(index=self.processorIndex, doc_type=self.processorPhraseType, body={"query":{"terms":{"is_training":["1","0"]}}})
-      print phrasesCount
       size = phrasesCount["count"]
       phrases = self.esClient.search(index=self.processorIndex, doc_type=self.processorPhraseType, body={"query":{"terms":{"is_training":["1","0"]}}}, size=size)
       phrases = phrases["hits"]["hits"]
@@ -90,7 +108,7 @@ class ClassificationWorker:
     else:
       self.phraseData = self.esClient.get(index=self.processorIndex, doc_type=self.processorPhraseType, id=self.phraseId)
       phrases = [self.phraseData]
-    print len(phrases), " phrases"
+
     for row in phrases:
       row = row["_source"]
       featureValues = []
@@ -188,3 +206,12 @@ class ClassificationWorker:
     print("Precision of Bad: " + str(round(precisionOfBad, 2)) + "%")
     print("Recall of Bad: " + str(round(recallOfBad, 2)) + "%")
     print("Balanced F-measure of Bad: " + str(round(fMeasureOfBad, 2)) + "%")
+
+  def unregisterDispatcher(self, dispatcher, message):
+    if message == "dying":
+      self.dispatchers.pop(dispatcher, None)
+
+    if len(self.dispatchers) == 0:
+      print len(self.dispatchers)
+      self.worker.end()
+      sys.exit(0)

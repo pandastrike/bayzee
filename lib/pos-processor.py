@@ -79,67 +79,66 @@ def annotate(config, documentId):
   esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
   print "pos-processor: Annotated document '" + document["_id"] + "'"
 
-def extractFeatures(config, phraseFeaturesDict):
+def extractFeatures(config, phrase, phraseFeatures):
 
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
   phraseProcessorType = config["processor"]["type"] + "__phrase"
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
-  for phrase in phraseFeaturesDict:
-    features = phraseFeaturesDict[phrase]
-    phraseData = esClient.get(index=processorIndex, doc_type=phraseProcessorType, id=__keyify(phrase))["_source"]
-    documentId = phraseData["document_id"]
-    annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=documentId)["_source"]
-    posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
-    phrase = phraseData["phrase"]
-    phrase = phrase.replace("\"", "")
-    phraseWords = nltk.word_tokenize(phrase)
-    foundMatch = True
-    for sentencePosTags in posTaggedSentences:
-      posTagString = firstPosTag = middlePosTag = lastPosTag = "X"
-      for i, sentencePosTag in enumerate(sentencePosTags):
-        if sentencePosTag[1][0:2] == "PO" or sentencePosTag[0] != phraseWords[0] or (i > len(sentencePosTags) - len(phraseWords)):
-          foundMatch = False
-          continue
-        posTagString = firstPosTag = sentencePosTag[1][0:2]
-        for j, phraseWord in enumerate(phraseWords[1:]):
-          if sentencePosTags[i+j+1][0] != phraseWord:
-            break
-          posTag = sentencePosTags[i+j+1][1][0:2]
-          if posTag != "PO":
-            posTagString += posTag
-            if len(phraseWords) > 2 and middlePosTag == "X":
-              middlePosTag = posTag
-            elif j == len(phraseWords) - 2 and lastPosTag == "X":
-              lastPosTag = posTag
-        if lastPosTag != "X":
-          foundMatch = True
+  features = phraseFeatures
+  phraseData = esClient.get(index=processorIndex, doc_type=phraseProcessorType, id=__keyify(phrase))["_source"]
+  documentId = phraseData["document_id"]
+  annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=documentId)["_source"]
+  posTaggedSentences = annotatedDocument["pos_tagged_sentences"]
+  phrase = phraseData["phrase"]
+  phrase = phrase.replace("\"", "")
+  phraseWords = nltk.word_tokenize(phrase)
+  foundMatch = True
+  for sentencePosTags in posTaggedSentences:
+    posTagString = firstPosTag = middlePosTag = lastPosTag = "X"
+    for i, sentencePosTag in enumerate(sentencePosTags):
+      if sentencePosTag[1][0:2] == "PO" or sentencePosTag[0] != phraseWords[0] or (i > len(sentencePosTags) - len(phraseWords)):
+        foundMatch = False
+        continue
+      posTagString = firstPosTag = sentencePosTag[1][0:2]
+      for j, phraseWord in enumerate(phraseWords[1:]):
+        if sentencePosTags[i+j+1][0] != phraseWord:
           break
-        else:
-          foundMatch = False
-      if foundMatch:
+        posTag = sentencePosTags[i+j+1][1][0:2]
+        if posTag != "PO":
+          posTagString += posTag
+          if len(phraseWords) > 2 and middlePosTag == "X":
+            middlePosTag = posTag
+          elif j == len(phraseWords) - 2 and lastPosTag == "X":
+            lastPosTag = posTag
+      if lastPosTag != "X":
+        foundMatch = True
         break
-    if not foundMatch:
-      posTagString = "X"
+      else:
+        foundMatch = False
+    if foundMatch:
+      break
+  if not foundMatch:
+    posTagString = "X"
 
-    # average word length as a feature
-    totalWordLength = 0
-    for word in phraseWords:
-      totalWordLength += len(word)
-    averageWordlength = round(totalWordLength * 1.0/len(phraseWords),2)
+  # average word length as a feature
+  totalWordLength = 0
+  for word in phraseWords:
+    totalWordLength += len(word)
+  averageWordlength = round(totalWordLength * 1.0/len(phraseWords),2)
 
-    # non alphabet characters in phrase as a feature
-    phraseString = phrase.replace(" ", "")
-    nonAlphaChars = 0
-    for char in phraseString:
-      if char.isalpha() == False and char != "'":
-        nonAlphaChars += 1
-    
-    features["pos_tags"] = posTagString
-    features["first_pos_tag"] = firstPosTag
-    features["middle_pos_tag"] = middlePosTag
-    features["last_pos_tag"] = lastPosTag
-    features["avg_word_length"] = str(averageWordlength)
-    features["non_alpha_chars"] = str(nonAlphaChars)
+  # non alphabet characters in phrase as a feature
+  phraseString = phrase.replace(" ", "")
+  nonAlphaChars = 0
+  for char in phraseString:
+    if char.isalpha() == False and char != "'":
+      nonAlphaChars += 1
+  
+  features["pos_tags"] = posTagString
+  features["first_pos_tag"] = firstPosTag
+  features["middle_pos_tag"] = middlePosTag
+  features["last_pos_tag"] = lastPosTag
+  features["avg_word_length"] = str(averageWordlength)
+  features["non_alpha_chars"] = str(nonAlphaChars)
 
-    print "pos-processor: Extracted features for '" + phrase + "'"
+  print "pos-processor: Extracted features for '" + phrase + "'"
