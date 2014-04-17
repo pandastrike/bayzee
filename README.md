@@ -1,6 +1,6 @@
-bayzee-muppet
+bayzee
 ======
-bayzee-muppet uses machine learning to generate domain relevant key phrases from a corpus of plain text documents and distributed using muppet.
+bayzee uses machine learning to generate domain relevant key phrases from a corpus of plain text documents.
 It uses Naive Bayes classification to predict whether a phrase is relevant to the domain of interest or not.
 It takes text content indexed in Elasticsearch as input and extracts features that are used by the classifier to predict.
 It needs a training set containing manually labeled phrases ('1' if relevant and '0' if not relevant) in csv format.
@@ -49,14 +49,20 @@ Following is a high level description of how bayzee works:
 ## Configuration
   bayzee is configured using YAML configuration file. Following is an example of the config file (inline comments describe each element in the configuration):
   
-  ```yaml
-  # Elasticsearch server
-  # Elasticsearch server
+```yaml
+# Elasticsearch server
 elasticsearch: 
-  # host where Elasticsearch server is running
+  # host on which Elasticsearch server is running
   host: "127.0.0.1"
   # port on which Elasticsearch server is listening
   port: 9200
+
+# Redis server
+redis:
+  #host on which redis is running
+  host: "127.0.0.1"
+  #port on which redis is listening
+  port: 6379
 
 # Corpus to use
 corpus:
@@ -68,7 +74,7 @@ corpus:
   textFields: ["name","description","category","manufacturer"]
 
 # number of documents to process at a time
-processingPageSize: 1000  
+processing_page_size: 1000  
 
 # Processors (add custom processors to list of modules)
 processor:
@@ -76,6 +82,8 @@ processor:
   index: "example_corpus__annotated"
   # name of the Elasticsearch document type where annotated text is stored by the processors
   type: "product"
+  # size of the page for documents to be obtained from elasticsearch
+  procesing_page_size: 1000
   # list of processor modules
   modules:
       # standard bayzee processor to POS tag english text
@@ -125,18 +133,20 @@ generator:
 
 # output directory (relative to the location of this config file)
 output_path: "../data"
-  ```
+```
 
 ## Customization
 Although, bayzee's standard processor extracts a predefined set of features from text, it is possible to extend bayzee with a custom 'processor' that extracts custom features specific to the domain. Custom processors can be configured in the 'processors' section of the configuration file. Any custom processor module should implement the following two functions:
 
-        annotate(config) 
-        extractFeatures(config, phraseFeaturesDict)
+        annotate(config, documentId) 
+        extractFeatures(config, phrase, phraseFeatures)
         
 where:
 
         'config' is a dictionary object containing configuration elements
-        'phraeFeaturesDict' is a dictionary object containing the configured features for each phrase as key
+        'documentId' is the id of the document that is to be annotated
+        'phrase' is the phrase for which the features are to be extracted
+        'phraseFeatures' is a dictionary object containing the configured features with feature name as the key
 
 See [pos-processor](./lib/pos-processor.py) for an example processor implementation.
 
@@ -145,18 +155,35 @@ See [pos-processor](./lib/pos-processor.py) for an example processor implementat
 * Clone the repo
 * Install [NLTK](http://www.nltk.org/install.html)
 * Install [orange](http://orange.biolab.si/download)
+* Install [muppet](https://pypi.python.org/pypi/muppet) `sudo pip install muppet`
 * Make sure Elasticsearch server is running and the corpus of documents are indexed in Elasticsearch
+* Make sure Redis server is running
 
 ## Run
 
+In order to support distributed classification, bayzee uses a dispatcher-worker pattern. A dispatcher sends units of work to worker processes which could be running on different boxes. There are three stages in the classification process: annotation, generation and classification. At each stage in the process, one dispatcher and one or more workers need to be started.
+
 * First, annotate text
 
-        bin/run -a <path-to-config-file>
+  * Start annotation dispatcher
+        bin/dispatcher -a <path-to-config-file>
+
+  * Start as many annotation workers are you desire
+        bin/worker -a <path-to-config-file>
 
 * Next, generate phrases and their features
 
-        bin/run -g <path-to-config-file>
+  * Start generation dispatcher
+        bin/dispatcher -g <path-to-config-file>
+
+  * Start as many generation workers are you desire
+        bin/worker -g <path-to-config-file>
+
 
 * Finally, classify phrases
 
-        bin/run -c <path-to-config-file>
+  * Start classification dispatcher
+        bin/dispatcher -c <path-to-config-file>
+
+  * Start as many classification workers are you desire
+        bin/worker -c <path-to-config-file>
