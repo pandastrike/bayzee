@@ -36,10 +36,10 @@ def __getDataDir(configFilePath, config):
     os.makedirs(dataDir)
   return dataDir
 
-def dispatchToAnnotate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
+def dispatchToAnnotate(configFilePath, processingStartIndex, processingEndIndex):
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
-  ann = annotation_dispatcher.AnnotationDispatcher(config, processingStartIndex, processingEndIndex, processingPageSize)
+  ann = annotation_dispatcher.AnnotationDispatcher(config, processingStartIndex, processingEndIndex)
   ann.dispatchToAnnotate()
 
 def annotate(configFilePath):
@@ -49,7 +49,7 @@ def annotate(configFilePath):
   ann = annotation_worker.AnnotationWorker(config)
   ann.annotate()
 
-def dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
+def dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex):
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
 
@@ -70,7 +70,7 @@ def dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex,
     values = row.split(",")
     holdOutDataset[values[0]] = values[1]
   print "entered"
-  gen = generation_dispatcher.GenerationDispatcher(config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex, processingPageSize)
+  gen = generation_dispatcher.GenerationDispatcher(config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex)
   gen.dispatchToGenerate()
   
 
@@ -97,9 +97,9 @@ def generate(configFilePath):
   gen.generate()
 
 
-def dispatchToClassify(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
+def dispatchToClassify(configFilePath, processingStartIndex, processingEndIndex):
   config = __loadConfig(configFilePath)
-  cls = classification_dispatcher.ClassificationDispatcher(config, processingStartIndex, processingEndIndex, processingPageSize)
+  cls = classification_dispatcher.ClassificationDispatcher(config, processingStartIndex, processingEndIndex)
   cls.dispatchToClassify()
 
 def classify(configFilePath):

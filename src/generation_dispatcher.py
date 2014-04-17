@@ -4,14 +4,13 @@ import os.path
 import json
 import re
 from elasticsearch import Elasticsearch
-from lib.muppet.durable_channel import DurableChannel
-from lib.muppet.remote_channel import RemoteChannel
+from muppet import DurableChannel, RemoteChannel
 
 __name__ = "generation_dispatcher"
 
 class GenerationDispatcher:
   
-  def __init__(self, config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex, processingPageSize):
+  def __init__(self, config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex):
     self.config = config
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.dataDir = dataDir
@@ -22,7 +21,7 @@ class GenerationDispatcher:
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
-    self.corpusFields = config["corpus"]["textFields"]
+    self.corpusFields = config["corpus"]["text_fields"]
     self.corpusSize = 0
     self.totalPhrasesDispatched = 0
     self.phrasesGenerated = 0
@@ -35,7 +34,7 @@ class GenerationDispatcher:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"]+"__phrase"
-    self.processingPageSize = processingPageSize
+    self.processingPageSize = config["processing_page_size"]
     config["processor_phrase_type"] = self.processorPhraseType
     
     self.featureNames = map(lambda x: x["name"], config["generator"]["features"])
@@ -56,7 +55,9 @@ class GenerationDispatcher:
     endPhraseIndex = -1
     if self.config["processingEndIndex"] != None: endPhraseIndex = self.config["processingEndIndex"]
 
-    print nextPhraseIndex, self.processingPageSize
+    if endPhraseIndex != -1 and self.processingPageSize > (endPhraseIndex - nextPhraseIndex):
+      self.processingPageSize = endPhraseIndex - nextPhraseIndex + 1
+    
     while True:
       phrases = self.esClient.search(index=processorIndex, doc_type=phraseProcessorType, body={"from": nextPhraseIndex,"size": self.processingPageSize, "query":{"match_all":{}},"sort":[{"phrase__not_analyzed":{"order":"asc"}}]}, fields=["_id"])
       if len(phrases["hits"]["hits"]) == 0: break
@@ -79,11 +80,6 @@ class GenerationDispatcher:
       
       if (self.phrasesGenerated + self.phrasesNotGenerated) >= self.totalPhrasesDispatched:
         self.controlChannel.send("dying")
-        content = {"type": "stop_dispatcher", "dispatcherId": self.dispatcherName}
-        self.generationDispatcher.send(content, self.workerName, self.timeout * self.timeout) # to be sert to a large value
-
-      if message["content"]["type"] == "stop_dispatcher":
-        self.generationDispatcher.close(message)
         break
 
     self.__terminate()

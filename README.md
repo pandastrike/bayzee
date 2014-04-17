@@ -1,6 +1,6 @@
-bayzee
+bayzee-muppet
 ======
-bayzee uses machine learning to generate domain relevant key phrases from a corpus of plain text documents.
+bayzee-muppet uses machine learning to generate domain relevant key phrases from a corpus of plain text documents and distributed using muppet.
 It uses Naive Bayes classification to predict whether a phrase is relevant to the domain of interest or not.
 It takes text content indexed in Elasticsearch as input and extracts features that are used by the classifier to predict.
 It needs a training set containing manually labeled phrases ('1' if relevant and '0' if not relevant) in csv format.

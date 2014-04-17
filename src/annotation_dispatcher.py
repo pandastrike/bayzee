@@ -4,8 +4,8 @@ import os.path
 import re
 from elasticsearch import Elasticsearch
 from time import sleep
-from lib.muppet.durable_channel import DurableChannel
-from lib.muppet.remote_channel import RemoteChannel
+from muppet import DurableChannel, RemoteChannel
+
 
 esStopWords = ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"]
 
@@ -13,22 +13,22 @@ __name__ = "annotation_dispatcher"
 
 class AnnotationDispatcher:
   
-  def __init__(self, config, processingStartIndex, processingEndIndex, processingPageSize):
+  def __init__(self, config, processingStartIndex, processingEndIndex):
     self.config = config
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
-    self.corpusFields = config["corpus"]["textFields"]
+    self.corpusFields = config["corpus"]["text_fields"]
     self.corpusSize = 0
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
-    self.processingPageSize = processingPageSize
+    self.processingPageSize = config["processing_page_size"]
     self.analyzerIndex = self.corpusIndex + "__analysis__"
     self.config["processingStartIndex"] = processingStartIndex
     self.config["processingEndIndex"] = processingEndIndex
-    self.config["processingPageSize"] = processingPageSize
+    self.config["processingPageSize"] = self.processingPageSize
     self.totalDocumentsDispatched = 0
     self.documentsAnnotated = 0
     self.documentsNotAnnotated = 0
@@ -39,6 +39,7 @@ class AnnotationDispatcher:
     self.timeout = 6000
     if processingEndIndex != None:
       self.dispatcherName += "." + str(processingStartIndex) + "." + str(processingEndIndex)
+    print self.dispatcherName
     analyzerIndexSettings = {
       "index":{
         "analysis":{
@@ -109,7 +110,12 @@ class AnnotationDispatcher:
     if self.config["processingStartIndex"] != None: nextDocumentIndex = self.config["processingStartIndex"]
     endDocumentIndex = -1
     if self.config["processingEndIndex"] != None: endDocumentIndex = self.config["processingEndIndex"]
+   
+    if endDocumentIndex != -1 and self.processingPageSize > (endDocumentIndex - nextDocumentIndex):
+      self.processingPageSize = endDocumentIndex - nextDocumentIndex + 1
+
     self.totalDocumentsDispatched = 0
+
     while True:
       documents = self.esClient.search(index=self.corpusIndex, doc_type=self.corpusType, body={"from": nextDocumentIndex,"size": self.processingPageSize,"query":{"match_all":{}}, "sort":[{"_id":{"order":"asc"}}]}, fields=["_id"])
       if len(documents["hits"]["hits"]) == 0: 
@@ -118,12 +124,13 @@ class AnnotationDispatcher:
       print "dispatching " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents..."
       for document in documents["hits"]["hits"]:
         print "dispatcher sending message for document ", document["_id"]
-        content = {"_id": document["_id"], "type": "annotate", "count": 1, "from":self.dispatcherName}
+        content = {"documentId": document["_id"], "type": "annotate", "count": 1, "from":self.dispatcherName}
         self.annotationDispatcher.send(content, self.workerName)
       nextDocumentIndex += len(documents["hits"]["hits"])
       if endDocumentIndex != -1 and endDocumentIndex <= nextDocumentIndex: 
         break
     
+    print self.totalDocumentsDispatched, " documents dispatched"
     while True:
       message = self.annotationDispatcher.receive()
       if "documentId" in message["content"] and message["content"]["documentId"] > 0:
@@ -133,17 +140,13 @@ class AnnotationDispatcher:
       
       if (self.documentsAnnotated + self.documentsNotAnnotated) >= self.totalDocumentsDispatched and not self.lastDispatcher:
         self.controlChannel.send("dying")
-        content = {"type": "stop_dispatcher", "dispatcherId": self.dispatcherName}
-        self.annotationDispatcher.send(content, self.workerName, self.timeout * self.timeout) # to be sert to a large value
-
-      if message["content"]["type"] == "stop_dispatcher":
-        self.annotationDispatcher.close(message)
+        self.annotationDispatcher.end()
+        print "dispatcher completed going down"
         break
     
     self.__terminate()
 
   def timeoutCallback(self, message):
-    
     if message["content"]["count"] < 5:
       message["content"]["count"] += 1
       self.annotationDispatcher.send(message["content"], self.workerName, self.timeout)

@@ -49,7 +49,7 @@ def annotate(config, documentId):
   esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
   corpusIndex = config["corpus"]["index"]
   corpusType = config["corpus"]["type"]
-  corpusFields = config["corpus"]["textFields"]
+  corpusFields = config["corpus"]["text_fields"]
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
   document = esClient.get(index=corpusIndex, doc_type=corpusType, id = documentId, fields=corpusFields)

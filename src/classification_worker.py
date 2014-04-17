@@ -7,8 +7,7 @@ import pickle
 import nltk
 import time
 from elasticsearch import Elasticsearch
-from lib.muppet.durable_channel import DurableChannel
-from lib.muppet.remote_channel import RemoteChannel
+from muppet import DurableChannel, RemoteChannel
 
 __name__ = "classification_worker"
 
@@ -38,10 +37,19 @@ class ClassificationWorker:
   def classify(self):
     while True:
       message = self.worker.receive()
+      if message["content"] == "kill":
+        if len(self.dispatchers) == 0:
+          message["responseId"] = message["requestId"]
+          self.worker.close(message)
+          break
+        else:
+          self.worker.send(content="kill", to=self.workerName)
+          continue
+
       if message["content"]["type"] == "classify":
         if message["content"]["from"] not in self.dispatchers:
           self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
-          self.dispatchers[message["content"]["from"]].listen(lambda m: self.unregisterDispatcher(message["content"]["from"], m))
+          self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
         self.phraseId = message["content"]["phraseId"]
         print "classifying phrase ", self.phraseId 
         if self.classifier == None:
@@ -212,6 +220,4 @@ class ClassificationWorker:
       self.dispatchers.pop(dispatcher, None)
 
     if len(self.dispatchers) == 0:
-      print len(self.dispatchers)
-      self.worker.end()
-      sys.exit(0)
+      self.worker.send(content="kill", to=self.workerName)

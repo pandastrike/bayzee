@@ -5,8 +5,7 @@ import json
 import re
 import sys
 from elasticsearch import Elasticsearch
-from lib.muppet.durable_channel import DurableChannel
-from lib.muppet.remote_channel import RemoteChannel
+from muppet import DurableChannel, RemoteChannel
 
 __name__ = "generation_worker"
 
@@ -20,7 +19,7 @@ class GenerationWorker:
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
-    self.corpusFields = config["corpus"]["textFields"]
+    self.corpusFields = config["corpus"]["text_fields"]
     self.corpusSize = 0
     self.timeout = 6000000
     self.processorIndex = config["processor"]["index"]
@@ -44,10 +43,19 @@ class GenerationWorker:
   def __extractFeatures(self):
     while True:
       message = self.worker.receive()
+      if message["content"] == "kill":
+        if len(self.dispatchers) == 0:
+          message["responseId"] = message["requestId"]
+          self.worker.close(message)
+          break
+        else:
+          self.worker.send(content="kill", to=self.workerName)
+          continue
+
       if message["content"]["type"] == "generate":
         if message["content"]["from"] not in self.dispatchers:
           self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
-          self.dispatchers[message["content"]["from"]].listen(lambda m: self.unregisterDispatcher(message["content"]["from"], m))
+          self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
         phraseId = message["content"]["phraseId"]
         phraseData = self.esClient.get(index=self.processorIndex, doc_type=self.processorPhraseType, id = phraseId)
         floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
@@ -125,6 +133,4 @@ class GenerationWorker:
       self.dispatchers.pop(dispatcher, None)
 
     if len(self.dispatchers) == 0:
-      print len(self.dispatchers)
-      self.worker.end()
-      sys.exit(0)
+      self.worker.send(content="kill", to=self.workerName)

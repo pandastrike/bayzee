@@ -5,6 +5,13 @@ elasticsearch:
   # port on which Elasticsearch server is listening
   port: 9200
 
+# Redis server
+redis:
+  # host on which redis server is running
+  host: "127.0.0.1"
+  # port on which redis server is listening
+  port: 6379
+
 # Corpus to use
 corpus:
   # name of the Elasticsearch index where the corpus is stored
@@ -12,10 +19,10 @@ corpus:
   # name of the Elasticsearch document type where the corpus is stored
   type: "product"
   # list of document fields to generate phrases from
-  textFields: ["name","description","category","manufacturer"]
+  text_fields: ["name","description","category","manufacturer"]
 
 # number of documents to process at a time
-processingPageSize: 1000  
+processing_page_size: 1000
 
 # Processors (add custom processors to list of modules)
 processor:

@@ -4,8 +4,7 @@ import os.path
 import re
 from elasticsearch import Elasticsearch
 from time import sleep
-from lib.muppet.durable_channel import DurableChannel
-from lib.muppet.remote_channel import RemoteChannel
+from muppet import DurableChannel, RemoteChannel
 
 esStopWords = ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"]
 
@@ -22,7 +21,7 @@ class AnnotationWorker:
     self.corpusFields = config["corpus"]["textFields"]
     self.corpusSize = 0
     self.workerName = "bayzee.annotation.worker"
-    self.timeout = 6000000000
+    self.timeout = 6000
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
@@ -33,11 +32,20 @@ class AnnotationWorker:
   def annotate(self):
     while True:
       message = self.worker.receive()
-      if message["content"]["type"] == "annotate":
+      if message["content"] == "kill":
+        message["responseId"] = message["requestId"]
+        self.worker.close(message)
+        if len(self.dispatchers) == 0:
+          self.worker.end()
+          break
+        else:
+          self.worker.send(content="kill", to=self.workerName)
+          continue
+      elif message["content"]["type"] == "annotate":
         if message["content"]["from"] not in self.dispatchers:
           self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
-          self.dispatchers[message["content"]["from"]].listen(lambda m: self.unregisterDispatcher(message["content"]["from"], m))
-        documentId = message["content"]["_id"]
+          self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
+        documentId = message["content"]["documentId"]
         document = self.esClient.get(index=self.corpusIndex, doc_type=self.corpusType, id = documentId, fields=self.corpusFields)
         for field in self.corpusFields:
           shingles = []
@@ -66,12 +74,6 @@ class AnnotationWorker:
         for processorInstance in self.config["processor_instances"]:
           processorInstance.annotate(self.config, documentId)
         self.worker.reply(message, {"documentId": documentId, "status" : "processed", "type" : "reply"}, self.timeout)
-      if message["content"]["type"] == "stop_dispatcher":
-        self.worker.reply(message, {"documentId": -1, "status" : "stop_dispatcher", "type" : "stop_dispatcher"}, self.timeout)        
-      if len(self.dispatchers) == 0:
-        print "worker exiting no more dispatchers found"
-        break
-    self.worker.end()
     print "worker closed"
 
   def unregisterDispatcher(self, dispatcher, message):
@@ -79,9 +81,7 @@ class AnnotationWorker:
       self.dispatchers.pop(dispatcher, None)
 
     if len(self.dispatchers) == 0:
-      print len(self.dispatchers)
-      self.worker.end()
-      sys.exit(0)
+      self.worker.send(content="kill", to=self.workerName)
 
   def __keyify(self, phrase):
     phrase = phrase.strip()
