@@ -5,7 +5,6 @@ import imp
 from src import annotation_dispatcher, annotation_worker
 from src import generation_dispatcher, generation_worker
 from src import classification_dispatcher, classification_worker
-from lib.muppet import durable_channel
 
 __name__ = "bayzee"
 
@@ -40,17 +39,15 @@ def __getDataDir(configFilePath, config):
 def dispatchToAnnotate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
-  dataDir = __getDataDir(configFilePath, config)
-  ann = annotation_dispatcher.AnnotationDispatcher(config, dataDir, processingStartIndex, processingEndIndex, processingPageSize)
-  print config["redis"]  
-  ann.dispatcher(durable_channel.DurableChannel(config["redis"]["dispatcher_name"], config["redis"]))
+  ann = annotation_dispatcher.AnnotationDispatcher(config, processingStartIndex, processingEndIndex, processingPageSize)
+  ann.dispatchToAnnotate()
 
 def annotate(configFilePath):
   config = __loadConfig(configFilePath)
   __loadProcessors(configFilePath, config)
   dataDir = __getDataDir(configFilePath, config)
   ann = annotation_worker.AnnotationWorker(config)
-  ann.annotate(durable_channel.DurableChannel(config["redis"]["worker_name"], config["redis"]))
+  ann.annotate()
 
 def dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
   config = __loadConfig(configFilePath)
@@ -74,7 +71,7 @@ def dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex,
     holdOutDataset[values[0]] = values[1]
   print "entered"
   gen = generation_dispatcher.GenerationDispatcher(config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex, processingPageSize)
-  gen.dispatcher(durable_channel.DurableChannel(config["redis"]["generation_dispatcher_name"], config["redis"]))
+  gen.dispatchToGenerate()
   
 
 def generate(configFilePath):
@@ -97,15 +94,15 @@ def generate(configFilePath):
     holdOutDataset[values[0]] = values[1]
 
   gen = generation_worker.GenerationWorker(config, trainingDataset, holdOutDataset)
-  gen.generate(durable_channel.DurableChannel(config["redis"]["generation_worker_name"], config["redis"]))
+  gen.generate()
 
 
 def dispatchToClassify(configFilePath, processingStartIndex, processingEndIndex, processingPageSize):
   config = __loadConfig(configFilePath)
   cls = classification_dispatcher.ClassificationDispatcher(config, processingStartIndex, processingEndIndex, processingPageSize)
-  cls.dispatcher(durable_channel.DurableChannel(config["redis"]["classification_dispatcher_name"], config["redis"]))
+  cls.dispatchToClassify()
 
 def classify(configFilePath):
   config = __loadConfig(configFilePath)
   cls = classification_worker.ClassificationWorker(config)
-  cls.classify(durable_channel.DurableChannel(config["redis"]["classification_worker_name"], config["redis"]))
+  cls.classify()
