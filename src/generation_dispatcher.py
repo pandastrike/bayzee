@@ -34,7 +34,7 @@ class GenerationDispatcher:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"]+"__phrase"
-    self.processingPageSize = config["processing_page_size"]
+    self.processingPageSize = config["processingPageSize"]
     config["processor_phrase_type"] = self.processorPhraseType
     
     self.featureNames = map(lambda x: x["name"], config["generator"]["features"])
