@@ -24,7 +24,7 @@ class AnnotationDispatcher:
     self.processorIndex = config["processor"]["index"]
     self.processorType = config["processor"]["type"]
     self.processorPhraseType = config["processor"]["type"] + "__phrase"
-    self.processingPageSize = config["processing_page_size"]
+    self.processingPageSize = config["processingPageSize"]
     self.analyzerIndex = self.corpusIndex + "__analysis__"
     self.config["processingStartIndex"] = processingStartIndex
     self.config["processingEndIndex"] = processingEndIndex

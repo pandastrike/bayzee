@@ -54,14 +54,15 @@ def annotate(config, documentId):
   processorType = config["processor"]["type"]
   document = esClient.get(index=corpusIndex, doc_type=corpusType, id = documentId, fields=corpusFields)
   content = ""
-  for field in corpusFields:
-    if field in document["fields"]:
-      if type(document["fields"][field]) is list:
-        for element in document["fields"][field]:
-          content += element + ". "
-      else:
-        content += document["fields"][field] + ". "
-    
+  if "fields" in document:
+    for field in corpusFields:
+      if field in document["fields"]:
+        if type(document["fields"][field]) is list:
+          for element in document["fields"][field]:
+            content += element + ". "
+        else:
+          content += document["fields"][field] + ". "
+      
   annotatedDocument = {}
   sentences = nltk.sent_tokenize(content)
   posTaggedSentences = []

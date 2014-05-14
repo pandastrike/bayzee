@@ -18,7 +18,7 @@ class AnnotationWorker:
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
-    self.corpusFields = config["corpus"]["textFields"]
+    self.corpusFields = config["corpus"]["text_fields"]
     self.corpusSize = 0
     self.workerName = "bayzee.annotation.worker"
     self.timeout = 6000
@@ -47,26 +47,27 @@ class AnnotationWorker:
           self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
         documentId = message["content"]["documentId"]
         document = self.esClient.get(index=self.corpusIndex, doc_type=self.corpusType, id = documentId, fields=self.corpusFields)
-        for field in self.corpusFields:
-          shingles = []
-          if field in document["fields"]:
-            if type(document["fields"][field]) is list:
-              for element in document["fields"][field]:
-                if len(element) > 0:
-                  shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
-                  shingles += shingleTokens["tokens"]
-            else:
-              if len(document["fields"][field]) > 0:
-                shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
-            shingles = map(self.__replaceUnderscore, shingles)
-            shingles = filter(self.__filterTokens, shingles)
-          if shingles != None and len(shingles) > 0:
-            for shingle in shingles:
-              phrase = shingle["token"]
-              key = self.__keyify(phrase)
-              if len(key) > 0:
-                if key not in self.bagOfPhrases:
-                  self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
+        if "fields" in document:  
+          for field in self.corpusFields:
+            shingles = []
+            if field in document["fields"]:
+              if type(document["fields"][field]) is list:
+                for element in document["fields"][field]:
+                  if len(element) > 0:
+                    shingleTokens = self.esClient.indices.analyze(index=self.analyzerIndex, body=element, analyzer="analyzer_shingle")
+                    shingles += shingleTokens["tokens"]
+              else:
+                if len(document["fields"][field]) > 0:
+                  shingles = self.esClient.indices.analyze(index=self.analyzerIndex, body=document["fields"][field], analyzer="analyzer_shingle")["tokens"]
+              shingles = map(self.__replaceUnderscore, shingles)
+              shingles = filter(self.__filterTokens, shingles)
+            if shingles != None and len(shingles) > 0:
+              for shingle in shingles:
+                phrase = shingle["token"]
+                key = self.__keyify(phrase)
+                if len(key) > 0:
+                  if key not in self.bagOfPhrases:
+                    self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
         for key in self.bagOfPhrases:
           data = self.bagOfPhrases[key]
           if not self.esClient.exists(index=self.processorIndex, doc_type=self.processorPhraseType, id=key):
