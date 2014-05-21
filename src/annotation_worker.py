@@ -15,7 +15,6 @@ class AnnotationWorker:
   def __init__(self, config):
     self.config = config
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
-    self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
     self.corpusFields = config["corpus"]["text_fields"]
@@ -28,7 +27,7 @@ class AnnotationWorker:
     self.analyzerIndex = self.corpusIndex + "__analysis__"
     self.worker = DurableChannel(self.workerName, config)
     self.dispatchers = {}
-  
+
   def annotate(self):
     while True:
       message = self.worker.receive()
@@ -66,12 +65,9 @@ class AnnotationWorker:
                 phrase = shingle["token"]
                 key = self.__keyify(phrase)
                 if len(key) > 0:
-                  if key not in self.bagOfPhrases:
-                    self.bagOfPhrases[key] = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
-        for key in self.bagOfPhrases:
-          data = self.bagOfPhrases[key]
-          if not self.esClient.exists(index=self.processorIndex, doc_type=self.processorPhraseType, id=key):
-            self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
+                  data = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
+                  if not self.esClient.exists(index=self.processorIndex, doc_type=self.processorPhraseType, id=key):
+                    self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
         for processorInstance in self.config["processor_instances"]:
           processorInstance.annotate(self.config, documentId)
         self.worker.reply(message, {"documentId": documentId, "status" : "processed", "type" : "reply"}, self.timeout)
