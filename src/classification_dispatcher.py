@@ -31,7 +31,7 @@ class ClassificationDispatcher:
     self.totalPhrasesDispatched = 0
     self.phrasesClassified = 0
     self.phrasesNotClassified = 0
-    self.timeout = 600000
+    self.timeout = 86400000
     self.dispatcherName = "bayzee.classification.dispatcher"
     if processingEndIndex != None:
       self.dispatcherName += "." + str(processingStartIndex) + "." + str(processingEndIndex)

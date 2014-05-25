@@ -26,7 +26,7 @@ class GenerationDispatcher:
     self.totalPhrasesDispatched = 0
     self.phrasesGenerated = 0
     self.phrasesNotGenerated = 0
-    self.timeout = 600000
+    self.timeout = 86400000
     self.dispatcherName = "bayzee.generation.dispatcher"
     if processingEndIndex != None:
       self.dispatcherName += "." + str(processingStartIndex) + "." + str(processingEndIndex)

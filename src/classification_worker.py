@@ -118,23 +118,26 @@ class ClassificationWorker:
       phrases = [self.phraseData]
 
     for row in phrases:
-      row = row["_source"]
-      featureValues = []
-      classType = "?"
-      for feature in self.features:
-        featureValues.append(row["features"][feature["name"]].encode("ascii"))
-      if dataType == "train":
-        classType = row["is_training"].encode("ascii", "ignore")
-      elif dataType == "holdout":
-        classType = row["is_holdout"].encode("ascii")
-      example = None
-      for i,featureValue in enumerate(featureValues):
-        attr = domain.attributes[i]
-        if type(attr) is orange.EnumVariable: 
-          attr.addValue(featureValue)
-      example = orange.Example(domain, (featureValues + [classType]))
-      example[domain.getmetas().items()[0][0]] = row["phrase"].encode("ascii")
-      table.append(example)
+      try:
+        row = row["_source"]
+        featureValues = []
+        classType = "?"
+        for feature in self.features:
+          featureValues.append(row["features"][feature["name"]].encode("ascii"))
+        if dataType == "train":
+          classType = row["is_training"].encode("ascii", "ignore")
+        elif dataType == "holdout":
+          classType = row["is_holdout"].encode("ascii")
+        example = None
+        for i,featureValue in enumerate(featureValues):
+          attr = domain.attributes[i]
+          if type(attr) is orange.EnumVariable: 
+            attr.addValue(featureValue)
+        example = orange.Example(domain, (featureValues + [classType]))
+        example[domain.getmetas().items()[0][0]] = row["phrase"].encode("ascii")
+        table.append(example)
+      except:
+        print "Error classifying phrase '" + row["phrase"] + "'"
     return table
 
   def __train(self):

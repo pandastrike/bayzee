@@ -36,7 +36,7 @@ class AnnotationDispatcher:
     self.endProcess = False
     self.dispatcherName = "bayzee.annotation.dispatcher"
     self.workerName = "bayzee.annotation.worker"
-    self.timeout = 6000
+    self.timeout = 86400000
     if processingEndIndex != None:
       self.dispatcherName += "." + str(processingStartIndex) + "." + str(processingEndIndex)
     print self.dispatcherName
