@@ -13,7 +13,7 @@ redis:
 # Corpus to use
 corpus:
   # name of the Elasticsearch index where the corpus is stored
-  index: "gluten_products"
+  index: "products"
   # name of the Elasticsearch document type where the corpus is stored
   type: "product"
   # list of document fields to generate phrases from
@@ -36,7 +36,7 @@ getCategoriesFromBing: True
 # Processors (add custom processors to list of modules)
 processor:
   # name of the Elasticsearch index where annotated text is stored by the processors
-  index: "gluten_products__annotated"
+  index: "products__annotated"
   # name of the Elasticsearch document type where annotated text is stored by the processors
   type: "product"
   # list of processor modules
