@@ -10,10 +10,10 @@ __name__ = "generation_dispatcher"
 
 class GenerationDispatcher:
   
-  def __init__(self, config, dataDir, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex):
+  def __init__(self, config, trainingDataset, holdOutDataset, processingStartIndex, processingEndIndex):
     self.config = config
+    self.logger = config["logger"]
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
-    self.dataDir = dataDir
     self.trainingDataset = trainingDataset
     self.holdOutDataset = holdOutDataset
     self.config["processingStartIndex"] = processingStartIndex
@@ -63,9 +63,9 @@ class GenerationDispatcher:
       if len(phrases["hits"]["hits"]) == 0: break
       self.totalPhrasesDispatched += len(phrases["hits"]["hits"])
       floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
-      print "Generating features from " + str(nextPhraseIndex) + " to " + str(nextPhraseIndex+len(phrases["hits"]["hits"])) + " phrases..."
+      self.logger.info("Generating features from " + str(nextPhraseIndex) + " to " + str(nextPhraseIndex+len(phrases["hits"]["hits"])) + " phrases...")
       for phraseData in phrases["hits"]["hits"]:
-        print "dispatcher sending message for phrase ", phraseData["_id"]
+        self.logger.info("Dispatching phrase " + phraseData["_id"])
         content = {"phraseId": phraseData["_id"], "type": "generate", "count": 1, "from": self.dispatcherName}
         self.generationDispatcher.send(content, self.workerName, self.timeout)
       nextPhraseIndex += len(phrases["hits"]["hits"])
@@ -76,7 +76,7 @@ class GenerationDispatcher:
       if "phraseId" in message["content"] and message["content"]["phraseId"] > 0:
         self.phrasesGenerated += 1
         self.generationDispatcher.close(message)
-        print message["content"]["phraseId"], self.phrasesGenerated
+        self.logger.info("Generated for " + message["content"]["phraseId"] + str(self.phrasesGenerated) + "/" + str(self.totalPhrasesDispatched))
       
       if (self.phrasesGenerated + self.phrasesNotGenerated) >= self.totalPhrasesDispatched:
         self.controlChannel.send("dying")
@@ -85,7 +85,7 @@ class GenerationDispatcher:
     self.__terminate()
     
   def timeoutCallback(self, message):
-    print message
+    config.logger.info("Message timed out: " + str(message))
     if message["content"]["count"] < 5:
       message["content"]["count"] += 1
       self.generationDispatcher.send(message["content"], self.workerName, self.timeout)
@@ -96,7 +96,8 @@ class GenerationDispatcher:
         self.__terminate()
 
   def __terminate(self):
-    print self.totalPhrasesDispatched, " total dispatched"
-    print self.phrasesGenerated, " generated"
-    print self.phrasesNotGenerated, " not generated"
-    print "process completed"
+    self.logger.info(str(self.totalPhrasesDispatched) + " total dispatched")
+    self.logger.info(str(self.phrasesGenerated) + " generated")
+    self.logger.info(str(self.phrasesNotGenerated) + " failed to generate")
+    self.logger.info("Generation complete")
+    self.logger.info("Terminating generation dispatcher")

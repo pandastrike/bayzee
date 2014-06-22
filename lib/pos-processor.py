@@ -78,10 +78,9 @@ def annotate(config, documentId):
     annotatedDocument = esClient.get(index=processorIndex, doc_type=processorType, id=document["_id"])["_source"]
   annotatedDocument["pos_tagged_sentences"] = posTaggedSentences
   esClient.index(index=processorIndex, doc_type=processorType, id=document["_id"], body=annotatedDocument)
-  print "pos-processor: Annotated document '" + document["_id"] + "'"
+  config["logger"].info("pos-processor: Annotated document '" + document["_id"] + "'")
 
 def extractFeatures(config, phrase, phraseFeatures):
-
   processorIndex = config["processor"]["index"]
   processorType = config["processor"]["type"]
   phraseProcessorType = config["processor"]["type"] + "__phrase"
@@ -142,4 +141,4 @@ def extractFeatures(config, phrase, phraseFeatures):
   features["avg_word_length"] = str(averageWordlength)
   features["non_alpha_chars"] = str(nonAlphaChars)
 
-  print "pos-processor: Extracted features for '" + phrase + "'"
+  config["logger"].info("pos-processor: Extracted features for '" + phrase + "'")

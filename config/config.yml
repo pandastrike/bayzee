@@ -5,29 +5,38 @@ elasticsearch:
   # port on which Elasticsearch server is listening
   port: 9200
 
-# Redis server
+#redis storage
 redis:
-  # host on which redis server is running
   host: "127.0.0.1"
-  # port on which redis server is listening
   port: 6379
 
 # Corpus to use
 corpus:
   # name of the Elasticsearch index where the corpus is stored
-  index: "example_corpus"
+  index: "gluten_products"
   # name of the Elasticsearch document type where the corpus is stored
   type: "product"
   # list of document fields to generate phrases from
-  text_fields: ["name","description","category","manufacturer"]
+  text_fields: ["description"]
+
+timeoutMonitorFrequency: 3600000
 
 # number of documents to process at a time
-processing_page_size: 1000
+processingPageSize: 1000
+
+# indicate whether to start annotating from scratch
+annotateFromScratch: True
+# indicate whether to generate shingles
+indexPhrases: True
+# indicate whether to generate postags
+getPosTags: True
+# indicate whether to get categories from Bing AdCenter API or not
+getCategoriesFromBing: True
 
 # Processors (add custom processors to list of modules)
 processor:
   # name of the Elasticsearch index where annotated text is stored by the processors
-  index: "example_corpus__annotated"
+  index: "gluten_products__annotated"
   # name of the Elasticsearch document type where annotated text is stored by the processors
   type: "product"
   # list of processor modules
@@ -75,7 +84,9 @@ generator:
     - name: "avg_score"
       is_numerical: True
   # precision of numerical features
-  float_precision: 4  
+  float_precision: 4
 
-# output directory (relative to the location of this config file)
-output_path: "../data"
+# logger config
+logger:
+  # directory where log files are written (relative to the location of this config file)
+  logsDir: "../logs"

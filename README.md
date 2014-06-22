@@ -52,38 +52,45 @@ Following is a high level description of how bayzee works:
 ```yaml
 # Elasticsearch server
 elasticsearch: 
-  # host on which Elasticsearch server is running
+  # host where Elasticsearch server is running
   host: "127.0.0.1"
   # port on which Elasticsearch server is listening
   port: 9200
 
-# Redis server
+#redis storage
 redis:
-  #host on which redis is running
   host: "127.0.0.1"
-  #port on which redis is listening
   port: 6379
 
 # Corpus to use
 corpus:
   # name of the Elasticsearch index where the corpus is stored
-  index: "example_corpus"
+  index: "gluten_products"
   # name of the Elasticsearch document type where the corpus is stored
   type: "product"
   # list of document fields to generate phrases from
-  textFields: ["name","description","category","manufacturer"]
+  text_fields: ["features"]
+
+timeoutMonitorFrequency: 3600000
 
 # number of documents to process at a time
-processing_page_size: 1000  
+processingPageSize: 1000
+
+# indicate whether to start annotating from scratch
+annotateFromScratch: True
+# indicate whether to generate shingles
+indexPhrases: True
+# indicate whether to generate postags
+getPosTags: True
+# indicate whether to get categories from Bing AdCenter API or not
+getCategoriesFromBing: True
 
 # Processors (add custom processors to list of modules)
 processor:
   # name of the Elasticsearch index where annotated text is stored by the processors
-  index: "example_corpus__annotated"
+  index: "products__annotated"
   # name of the Elasticsearch document type where annotated text is stored by the processors
   type: "product"
-  # size of the page for documents to be obtained from elasticsearch
-  procesing_page_size: 1000
   # list of processor modules
   modules:
       # standard bayzee processor to POS tag english text
@@ -129,10 +136,12 @@ generator:
     - name: "avg_score"
       is_numerical: True
   # precision of numerical features
-  float_precision: 4  
+  float_precision: 4
 
-# output directory (relative to the location of this config file)
-output_path: "../data"
+# logger config
+logger:
+  # directory where log files are written (relative to the location of this config file)
+  logsDir: "../logs"
 ```
 
 ## Customization
@@ -166,24 +175,30 @@ In order to support distributed classification, bayzee uses a dispatcher-worker 
 * First, annotate text
 
   * Start annotation dispatcher
-        bin/dispatcher -a <path-to-config-file>
+
+        bin/dispatcher -a `<path-to-config-file>`
 
   * Start as many annotation workers are you desire
-        bin/worker -a <path-to-config-file>
+
+        bin/worker -a `<path-to-config-file>`
 
 * Next, generate phrases and their features
 
   * Start generation dispatcher
-        bin/dispatcher -g <path-to-config-file>
+
+        bin/dispatcher -g `<path-to-config-file>`
 
   * Start as many generation workers are you desire
-        bin/worker -g <path-to-config-file>
+
+        bin/worker -g `<path-to-config-file>`
 
 
 * Finally, classify phrases
 
   * Start classification dispatcher
-        bin/dispatcher -c <path-to-config-file>
+
+        bin/dispatcher -c `<path-to-config-file>`
 
   * Start as many classification workers are you desire
-        bin/worker -c <path-to-config-file>
+
+        bin/worker -c `<path-to-config-file>`

@@ -12,6 +12,7 @@ class ClassificationDispatcher:
   
   def __init__(self, config, processingStartIndex, processingEndIndex):
     self.config = config
+    self.logger = config["logger"]
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.config["processingStartIndex"] = processingStartIndex
     self.config["processingEndIndex"] = processingEndIndex
@@ -59,33 +60,34 @@ class ClassificationDispatcher:
       if len(phrases["hits"]["hits"]) == 0: break
       self.totalPhrasesDispatched += len(phrases["hits"]["hits"])
       floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
-      print "Classifying phrases from " + str(nextPhraseIndex) + " to " + str(nextPhraseIndex+len(phrases["hits"]["hits"])) + " phrases..."
+      self.logger.info("Classifying phrases from " + str(nextPhraseIndex) + " to " + str(nextPhraseIndex+len(phrases["hits"]["hits"])) + " phrases...")
       for phraseData in phrases["hits"]["hits"]:
-        print "dispatcher sending message for phrase ", phraseData["_id"], "to clasification worker"
+        self.logger.info("Dispatched phrase " + phraseData["_id"])
         content = {"phraseId": phraseData["_id"], "type": "classify", "count": 1, "from": self.dispatcherName}
         self.classificationDispatcher.send(content, self.workerName, self.timeout)
   
       nextPhraseIndex += len(phrases["hits"]["hits"])
       if endPhraseIndex != -1 and nextPhraseIndex >= endPhraseIndex: break
     
-    print "dispatching completed for ", self.totalPhrasesDispatched
+    self.logger.info("Dispatched " + str(self.totalPhrasesDispatched) + " phrases")
     
     while True:
       message = self.classificationDispatcher.receive()
       if "phraseId" in message["content"] and message["content"]["phraseId"] > 0:
         self.phrasesClassified += 1
         self.classificationDispatcher.close(message)
-        print message["content"]["phraseId"], self.phrasesClassified
+        self.logger.info("Classified phrase " + message["content"]["phraseId"] + " " + str(self.phrasesClassified) + "/" + str(self.totalPhrasesDispatched))
       
       if (self.phrasesClassified + self.phrasesNotClassified) >= self.totalPhrasesDispatched:
         self.controlChannel.send("dying")
+        self.classificationDispatcher.end()
         break
     
     self.__terminate()
 
 
   def timeoutCallback(self, message):
-    print message
+    self.logger.info("Message timed out: " + str(message))
     if message["content"]["count"] < 5:
       message["content"]["count"] += 1
       self.classificationDispatcher.send(message["content"], self.workerName, self.timeout)
@@ -96,7 +98,8 @@ class ClassificationDispatcher:
         self.__terminate()
 
   def __terminate(self):
-    print self.totalPhrasesDispatched, " total dispatched"
-    print self.phrasesClassified, " classified"
-    print self.phrasesNotClassified, " not classified"
-    print "process completed"
+    self.logger.info(str(self.totalPhrasesDispatched) + " total dispatched")
+    self.logger.info(str(self.phrasesClassified) + " classified")
+    self.logger.info(str(self.phrasesNotClassified) + " failed to classify")
+    self.logger.info("Classification complete")
+    self.logger.info("Terminating classification dispatcher")

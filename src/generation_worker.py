@@ -13,6 +13,7 @@ class GenerationWorker:
   
   def __init__(self, config, trainingDataset, holdOutDataset):
     self.config = config
+    self.logger = config["logger"]
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.trainingDataset = trainingDataset
     self.holdOutDataset = holdOutDataset
@@ -44,15 +45,15 @@ class GenerationWorker:
     while True:
       message = self.worker.receive()
       if message["content"] == "kill":
+        message["responseId"] = message["requestId"]
+        self.worker.close(message)
         if len(self.dispatchers) == 0:
-          message["responseId"] = message["requestId"]
-          self.worker.close(message)
+          self.worker.end()
           break
         else:
           self.worker.send(content="kill", to=self.workerName)
           continue
-
-      if message["content"]["type"] == "generate":
+      elif message["content"]["type"] == "generate":
         if message["content"]["from"] not in self.dispatchers:
           self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
           self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
@@ -61,7 +62,7 @@ class GenerationWorker:
         floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
         token = phraseData["_source"]["phrase"]
         documentId = phraseData["_source"]["document_id"]
-        print "Extracted common features for phrase '" + token + "'"
+        self.logger.info("Extracted common features for phrase '" + token + "'")
         entry = {}
         shouldMatch = map(lambda x: {"match_phrase":{x:token}}, self.corpusFields)
         query = {"query":{"bool":{"should":shouldMatch}}}
@@ -122,11 +123,8 @@ class GenerationWorker:
         self.worker.reply(message, {"phraseId": phraseId, "status" : "generated", "type" : "reply"}, 120000000)   
       if message["content"]["type"] == "stop_dispatcher":
         self.worker.reply(message, {"phraseId": -1, "status" : "stop_dispatcher", "type" : "stop_dispatcher"}, self.timeout)        
-      if len(self.dispatchers) == 0:
-        print "worker exiting no more dispatchers found"
-        break
-    self.worker.end()
-    print "worker closed"
+
+    self.logger.info("Terminating generation worker")
 
   def unregisterDispatcher(self, dispatcher, message):
     if message == "dying":

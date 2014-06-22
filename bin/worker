@@ -2,6 +2,7 @@
 import sys
 import os
 import imp
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 bayzee = imp.load_source("bayzee", os.path.abspath(os.path.join(os.path.dirname(__file__), "../__init__.py")))
 if len(sys.argv) != 3: 

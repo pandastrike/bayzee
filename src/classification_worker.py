@@ -15,6 +15,7 @@ class ClassificationWorker:
 
   def __init__(self, config):
     self.config = config
+    self.logger = config["logger"]
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.trainD = None
     self.classifier = None
@@ -38,20 +39,19 @@ class ClassificationWorker:
     while True:
       message = self.worker.receive()
       if message["content"] == "kill":
+        message["responseId"] = message["requestId"]
+        self.worker.close(message)
         if len(self.dispatchers) == 0:
-          message["responseId"] = message["requestId"]
-          self.worker.close(message)
+          self.worker.end()
           break
         else:
           self.worker.send(content="kill", to=self.workerName)
           continue
-
-      if message["content"]["type"] == "classify":
+      elif message["content"]["type"] == "classify":
         if message["content"]["from"] not in self.dispatchers:
           self.dispatchers[message["content"]["from"]] = RemoteChannel(message["content"]["from"], self.config)
           self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
         self.phraseId = message["content"]["phraseId"]
-        print "classifying phrase ", self.phraseId 
         if self.classifier == None:
           self.trainD = self.__loadDataFromES("train", None)
           self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
@@ -63,8 +63,6 @@ class ClassificationWorker:
         self.trainD = orange.Preprocessor_discretize(self.trainD, method=orange.EntropyDiscretization())
         testD = orange.ExampleTable(self.trainD.domain, testD)
 
-        print("Classifying " + str(len(testD)) + " phrases with Naive Bayes Classifier...")
-
         for row in testD:
           phrase = row.getmetas().values()[0].value
           featureSet = {}
@@ -75,16 +73,11 @@ class ClassificationWorker:
           classType = self.classifier.classify(featureSet)
           self.phraseData["_source"]["prob"] = prob
           self.phraseData["_source"]["class_type"] = classType
-          print prob, classType
+          self.logger.info("Classified '" + phrase + "' as " + classType + " with probability " + str(prob))
           self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=self.phraseId, body=self.phraseData["_source"])
           self.worker.reply(message, {"phraseId": self.phraseId, "status" : "classified", "type" : "reply"}, 120000000)   
-      if message["content"]["type"] == "stop_dispatcher":
-        self.worker.reply(message, {"phraseId": -1, "status" : "stop_dispatcher", "type" : "stop_dispatcher"}, self.timeout)        
-      if len(self.dispatchers) == 0:
-        print "worker exiting no more dispatchers found"
-        break
-    self.worker.end()
-    # self.__calculateMeasures()
+
+    self.logger.info("Terminating classification worker")
 
   def __getOrangeVariableForFeature(self, feature):
     if feature["is_numerical"]: 
@@ -137,12 +130,12 @@ class ClassificationWorker:
         example[domain.getmetas().items()[0][0]] = row["phrase"].encode("ascii")
         table.append(example)
       except:
-        print "Error classifying phrase '" + row["phrase"] + "'"
+        self.logger.error("Error classifying phrase '" + row["phrase"] + "'")
     return table
 
   def __train(self):
     for a in self.trainD.domain.attributes:
-      print "%s: %s" % (a.name,reduce(lambda x,y: x+', '+y, [i for i in a.values]))
+      self.logger.info("%s: %s" % (a.name,reduce(lambda x,y: x+', '+y, [i for i in a.values])))
     trainSet = []
     for row in self.trainD:
       phrase = row.getmetas().values()[0].value
@@ -154,10 +147,9 @@ class ClassificationWorker:
 
       trainSet.append((featureSet, classType))
 
-    print("\nTraining Naive Bayes Classifier with " + str(len(trainSet)) + " phrases...")
+    self.logger.info("\nTraining Naive Bayes Classifier with " + str(len(trainSet)) + " phrases...")
     self.classifier = nltk.NaiveBayesClassifier.train(trainSet)
     
-
     self.classifier.show_most_informative_features(50)
 
   def __calculateMeasures(self):
@@ -211,12 +203,12 @@ class ClassificationWorker:
     precisionOfBad = 100.0 * trueNegatives/totalNegatives
     recallOfBad = 100.0*trueNegatives/totalHoldOutBadPhrases
     fMeasureOfBad = 2.0 * precisionOfBad * recallOfBad / (precisionOfBad + recallOfBad)
-    print("\nPrecision of Good: " + str(round(precisionOfGood, 2)) + "%")
-    print("Recall of Good: " + str(round(recallOfGood, 2)) + "%")
-    print("Balanced F-measure of Good: " + str(round(fMeasureOfGood, 2)) + "%")
-    print("Precision of Bad: " + str(round(precisionOfBad, 2)) + "%")
-    print("Recall of Bad: " + str(round(recallOfBad, 2)) + "%")
-    print("Balanced F-measure of Bad: " + str(round(fMeasureOfBad, 2)) + "%")
+    self.logger.info("\nPrecision of Good: " + str(round(precisionOfGood, 2)) + "%")
+    self.logger.info("Recall of Good: " + str(round(recallOfGood, 2)) + "%")
+    self.logger.info("Balanced F-measure of Good: " + str(round(fMeasureOfGood, 2)) + "%")
+    self.logger.info("Precision of Bad: " + str(round(precisionOfBad, 2)) + "%")
+    self.logger.info("Recall of Bad: " + str(round(recallOfBad, 2)) + "%")
+    self.logger.info("Balanced F-measure of Bad: " + str(round(fMeasureOfBad, 2)) + "%")
 
   def unregisterDispatcher(self, dispatcher, message):
     if message == "dying":

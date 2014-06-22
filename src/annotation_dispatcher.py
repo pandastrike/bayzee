@@ -15,6 +15,7 @@ class AnnotationDispatcher:
   
   def __init__(self, config, processingStartIndex, processingEndIndex):
     self.config = config
+    self.logger = config["logger"]
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.bagOfPhrases = {}
     self.corpusIndex = config["corpus"]["index"]
@@ -39,7 +40,7 @@ class AnnotationDispatcher:
     self.timeout = 86400000
     if processingEndIndex != None:
       self.dispatcherName += "." + str(processingStartIndex) + "." + str(processingEndIndex)
-    print self.dispatcherName
+
     analyzerIndexSettings = {
       "index":{
         "analysis":{
@@ -93,7 +94,7 @@ class AnnotationDispatcher:
         data = self.esClient.indices.create(self.analyzerIndex, analyzerIndexSettings) 
       except:
         error = sys.exc_info()
-        print "Error occurred during initialization of analyzer index", error
+        self.logger.error("Error occurred during initialization of analyzer index: " + str(error))
         sys.exit(1)
       else:
         sleep(1)
@@ -121,27 +122,26 @@ class AnnotationDispatcher:
       if len(documents["hits"]["hits"]) == 0: 
         break
       self.totalDocumentsDispatched += len(documents["hits"]["hits"])
-      print "dispatching " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents..."
+      self.logger.info("Annotating " + str(nextDocumentIndex) + " to " + str(nextDocumentIndex+len(documents["hits"]["hits"])) + " documents...")
       for document in documents["hits"]["hits"]:
-        print "dispatcher sending message for document ", document["_id"]
+        self.logger.info("Dispatching document " + document["_id"])
         content = {"documentId": document["_id"], "type": "annotate", "count": 1, "from":self.dispatcherName}
         self.annotationDispatcher.send(content, self.workerName)
       nextDocumentIndex += len(documents["hits"]["hits"])
       if endDocumentIndex != -1 and endDocumentIndex <= nextDocumentIndex: 
         break
     
-    print self.totalDocumentsDispatched, " documents dispatched"
+    self.logger.info(str(self.totalDocumentsDispatched) + " documents dispatched")
     while True:
       message = self.annotationDispatcher.receive()
       if "documentId" in message["content"] and message["content"]["documentId"] > 0:
         self.documentsAnnotated += 1
         self.annotationDispatcher.close(message)
-        print message["content"]["documentId"], self.documentsAnnotated
+        self.logger.info("Annotated document " + message["content"]["documentId"] + " - " + str(self.documentsAnnotated) + "/" + str(self.totalDocumentsDispatched))
       
       if (self.documentsAnnotated + self.documentsNotAnnotated) >= self.totalDocumentsDispatched and not self.lastDispatcher:
         self.controlChannel.send("dying")
         self.annotationDispatcher.end()
-        print "dispatcher completed going down"
         break
     
     self.__terminate()
@@ -157,14 +157,12 @@ class AnnotationDispatcher:
         self.__terminate()
 
   def __terminate(self):
-    print self.totalDocumentsDispatched, " total dispatched"
-    print self.documentsAnnotated, " total received"
-    print self.documentsNotAnnotated, " not annotated"
-    print "process completed"
-    # sys.exit(0)
-
+    self.logger.info(str(self.totalDocumentsDispatched) + " total dispatched")
+    self.logger.info(str(self.documentsAnnotated) + " annotated")
+    self.logger.info(str(self.documentsNotAnnotated) + " failed to annotate")
+    self.logger.info("Annotation complete")
+    self.logger.info("Terminating annotation dispatcher")
 
   def __deleteAnalyzerIndex(self):
     if self.esClient.indices.exists(self.analyzerIndex):
         self.esClient.indices.delete(self.analyzerIndex)
-

@@ -14,6 +14,7 @@ class AnnotationWorker:
   
   def __init__(self, config):
     self.config = config
+    self.logger = config["logger"]
     self.esClient = Elasticsearch(config["elasticsearch"]["host"] + ":" + str(config["elasticsearch"]["port"]))
     self.corpusIndex = config["corpus"]["index"]
     self.corpusType = config["corpus"]["type"]
@@ -71,7 +72,8 @@ class AnnotationWorker:
         for processorInstance in self.config["processor_instances"]:
           processorInstance.annotate(self.config, documentId)
         self.worker.reply(message, {"documentId": documentId, "status" : "processed", "type" : "reply"}, self.timeout)
-    print "worker closed"
+
+    self.logger.info("Terminating annotation worker")
 
   def unregisterDispatcher(self, dispatcher, message):
     if message == "dying":
@@ -110,4 +112,3 @@ class AnnotationWorker:
     isValid = (isValid and firstToken not in esStopWords)
     isValid = (isValid and lastToken not in esStopWords)
     return isValid
-
