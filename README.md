@@ -174,29 +174,29 @@ In order to support distributed classification, bayzee uses a dispatcher-worker 
 
   * Start annotation dispatcher
 
-        bin/dispatcher -a `<path-to-config-file>`
+            bin/dispatcher -a `<path-to-config-file>`
 
   * Start as many annotation workers are you desire
 
-        bin/worker -a `<path-to-config-file>`
+            bin/worker -a `<path-to-config-file>`
 
 * Next, generate phrases and their features
 
   * Start generation dispatcher
 
-        bin/dispatcher -g `<path-to-config-file>`
+            bin/dispatcher -g `<path-to-config-file>`
 
   * Start as many generation workers are you desire
 
-        bin/worker -g `<path-to-config-file>`
+            bin/worker -g `<path-to-config-file>`
 
 
 * Finally, classify phrases
 
   * Start classification dispatcher
 
-        bin/dispatcher -c `<path-to-config-file>`
+            bin/dispatcher -c `<path-to-config-file>`
 
   * Start as many classification workers are you desire
 
-        bin/worker -c `<path-to-config-file>`
+            bin/worker -c `<path-to-config-file>`
