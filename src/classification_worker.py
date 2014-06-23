@@ -80,7 +80,7 @@ class ClassificationWorker:
     self.logger.info("Terminating classification worker")
 
   def __getOrangeVariableForFeature(self, feature):
-    if feature["is_numerical"]: 
+    if feature["isNumerical"]: 
       return orange.FloatVariable(feature["name"])
     else:
       return orange.EnumVariable(feature["name"])

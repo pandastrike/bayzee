@@ -65,11 +65,11 @@ redis:
 # Corpus to use
 corpus:
   # name of the Elasticsearch index where the corpus is stored
-  index: "gluten_products"
+  index: "products"
   # name of the Elasticsearch document type where the corpus is stored
   type: "product"
   # list of document fields to generate phrases from
-  text_fields: ["features"]
+  text_fields: ["description"]
 
 timeoutMonitorFrequency: 3600000
 
@@ -82,8 +82,6 @@ annotateFromScratch: True
 indexPhrases: True
 # indicate whether to generate postags
 getPosTags: True
-# indicate whether to get categories from Bing AdCenter API or not
-getCategoriesFromBing: True
 
 # Processors (add custom processors to list of modules)
 processor:
@@ -101,42 +99,42 @@ processor:
       # features that this processor extracts
       features:
         - name: "pos_tags"
-          is_numerical: False
+          isNumerical: False
         - name: "first_pos_tag"
-          is_numerical: False
+          isNumerical: False
         - name: "middle_pos_tag"
-          is_numerical: False
+          isNumerical: False
         - name: "last_pos_tag"
-          is_numerical: False
+          isNumerical: False
         - name: "avg_word_length"
-          is_numerical: True
+          isNumerical: True
         - name: "non_alpha_chars"
-          is_numerical: True
+          isNumerical: True
 
 # Generation
 generator:
   # training set file path (relative to the location of this config file)
-  training_phrases_file_path: "training-phrases.csv"
+  trainingPhrasesFilePath: "training-phrases.csv"
   # hold-out set file path (relative to the location of this config file)
-  hold_out_phrases_file_path: "hold-out-phrases.csv"
+  holdOutPhrasesFilePath: "hold-out-phrases.csv"
   # maximum number of words in generated phrase
-  max_shingle_size: 3
+  maxShingleSize: 3
   # minimum number of words in generated phrase
-  min_shingle_size: 2
+  minShingleSize: 2
   # list of features to extract
   features:
     - name: "doc_count"
-      is_numerical: True
+      isNumerical: True
     - name: "max_term_frequency"
-      is_numerical: True
+      isNumerical: True
     - name: "avg_term_frequency"
-      is_numerical: True
+      isNumerical: True
     - name: "max_score"
-      is_numerical: True
+      isNumerical: True
     - name: "avg_score"
-      is_numerical: True
+      isNumerical: True
   # precision of numerical features
-  float_precision: 4
+  floatPrecision: 4
 
 # logger config
 logger:

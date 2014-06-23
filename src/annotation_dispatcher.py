@@ -54,9 +54,9 @@ class AnnotationDispatcher:
           "filter":{
             "filter_shingle":{
               "type": "shingle",
-              "max_shingle_size": config["generator"]["max_shingle_size"],
-              "min_shingle_size": config["generator"]["min_shingle_size"],
-              "output_unigrams": (config["generator"]["min_shingle_size"] == 1)
+              "max_shingle_size": config["generator"]["maxShingleSize"],
+              "min_shingle_size": config["generator"]["minShingleSize"],
+              "output_unigrams": (config["generator"]["minShingleSize"] == 1)
             },
             "filter_stop":{
               "type": "stop"

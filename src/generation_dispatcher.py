@@ -62,7 +62,7 @@ class GenerationDispatcher:
       phrases = self.esClient.search(index=processorIndex, doc_type=phraseProcessorType, body={"from": nextPhraseIndex,"size": self.processingPageSize, "query":{"match_all":{}},"sort":[{"phrase__not_analyzed":{"order":"asc"}}]}, fields=["_id"])
       if len(phrases["hits"]["hits"]) == 0: break
       self.totalPhrasesDispatched += len(phrases["hits"]["hits"])
-      floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
+      floatPrecision = "{0:." + str(self.config["generator"]["floatPrecision"]) + "f}"
       self.logger.info("Generating features from " + str(nextPhraseIndex) + " to " + str(nextPhraseIndex+len(phrases["hits"]["hits"])) + " phrases...")
       for phraseData in phrases["hits"]["hits"]:
         self.logger.info("Dispatching phrase " + phraseData["_id"])

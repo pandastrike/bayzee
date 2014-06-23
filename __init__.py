@@ -86,8 +86,8 @@ def dispatchToGenerate(configFilePath, processingStartIndex, processingEndIndex)
   __loadProcessors(configFilePath, config)
   __initLogger(configFilePath, config)
 
-  trainingFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["training_phrases_file_path"]))
-  holdOutFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["hold_out_phrases_file_path"]))
+  trainingFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["trainingPhrasesFilePath"]))
+  holdOutFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["holdOutPhrasesFilePath"]))
   trainingFile = open(trainingFilePath, "r")
   holdOutFile = open(holdOutFilePath, "r")
 
@@ -109,8 +109,8 @@ def generate(configFilePath):
   __loadProcessors(configFilePath, config)
   __initLogger(configFilePath, config)
 
-  trainingFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["training_phrases_file_path"]))
-  holdOutFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["hold_out_phrases_file_path"]))
+  trainingFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["trainingPhrasesFilePath"]))
+  holdOutFilePath = os.path.abspath(os.path.join(os.path.dirname(configFilePath), config["generator"]["holdOutPhrasesFilePath"]))
   trainingFile = open(trainingFilePath, "r")
   holdOutFile = open(holdOutFilePath, "r")
   

@@ -59,7 +59,7 @@ class GenerationWorker:
           self.dispatchers[message["content"]["from"]].listen(self.unregisterDispatcher)
         phraseId = message["content"]["phraseId"]
         phraseData = self.esClient.get(index=self.processorIndex, doc_type=self.processorPhraseType, id = phraseId)
-        floatPrecision = "{0:." + str(self.config["generator"]["float_precision"]) + "f}"
+        floatPrecision = "{0:." + str(self.config["generator"]["floatPrecision"]) + "f}"
         token = phraseData["_source"]["phrase"]
         documentId = phraseData["_source"]["document_id"]
         self.logger.info("Extracted common features for phrase '" + token + "'")
