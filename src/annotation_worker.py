@@ -69,6 +69,7 @@ class AnnotationWorker:
                   data = {"phrase": phrase,"phrase__not_analyzed": phrase,"document_id": document["_id"]}
                   if not self.esClient.exists(index=self.processorIndex, doc_type=self.processorPhraseType, id=key):
                     self.esClient.index(index=self.processorIndex, doc_type=self.processorPhraseType, id=key, body=data)
+        sleep(1)
         for processorInstance in self.config["processor_instances"]:
           processorInstance.annotate(self.config, documentId)
         self.worker.reply(message, {"documentId": documentId, "status" : "processed", "type" : "reply"}, self.timeout)
