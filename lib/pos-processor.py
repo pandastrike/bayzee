@@ -71,7 +71,7 @@ def annotate(config, documentId):
     if len(sentence) > 1:
       sentence = sentence.replace("-", " ")
       sentenceWords = nltk.word_tokenize(sentence.lower())
-      sentenceWords = map(lambda x: x.replace(".", ""), sentenceWords)
+      sentenceWords = filter(lambda x: len(x) > 0, map(lambda x: x.replace(".", "").strip(), sentenceWords))
       posTags = nltk.pos_tag(sentenceWords)
       posTaggedSentences.append(posTags)
   if esClient.exists(index=processorIndex, doc_type=processorType, id=document["_id"]):
